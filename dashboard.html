@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trimstone — Pipeline Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<!-- Supabase JS replaced with direct REST fetch calls -->
+<style>
+/* ── TOKENS ─────────────────────────────────── */
+:root{
+  --navy:#0f1f3d;--navy-mid:#1a3260;
+  --gold:#c9a84c;--gold-light:#e8c97a;--gold-pale:#faf3e0;
+  --cream:#fdfbf7;--white:#ffffff;
+  --gray-50:#f8f7f5;--gray-100:#eeece8;--gray-200:#d8d5ce;
+  --gray-300:#c0bcb3;--gray-400:#9e9b93;--gray-600:#6b6860;--gray-800:#2c2b27;
+  --green:#639922;--green-lt:#EAF3DE;--green-txt:#27500A;
+  --red:#E24B4A;--red-lt:#FCEBEB;--red-txt:#7F1D1D;
+  --amber:#EF9F27;--amber-lt:#FAEEDA;--amber-txt:#412402;
+  --purple:#7F77DD;--purple-lt:#EEEDFE;--purple-txt:#3C3489;
+  --blue:#378ADD;--blue-lt:#E6F1FB;--blue-txt:#0C447C;
+  --teal:#1D9E75;--teal-lt:#E1F5EE;--teal-txt:#085041;
+  --sidebar:260px;--topbar:56px;
+  --r4:4px;--r8:8px;--r12:12px;--r16:16px;
+  --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px;-webkit-font-smoothing:antialiased}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--gray-800);display:flex;min-height:100vh}
+
+/* ── SIDEBAR ─────────────────────────────────── */
+.sidebar{width:var(--sidebar);background:var(--navy);min-height:100vh;position:fixed;left:0;top:0;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+.sidebar-logo-name{font-family:'DM Serif Display',serif;font-size:20px;color:var(--white);letter-spacing:.02em}
+.sidebar-logo-sub{font-size:9px;color:rgba(201,168,76,.7);letter-spacing:.18em;text-transform:uppercase;margin-top:5px;font-weight:500}
+.sidebar-section{padding:14px 0 4px}
+.sidebar-label{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.28);padding:0 20px 7px}
+.sidebar-btn{display:flex;align-items:center;gap:9px;padding:8px 20px;font-size:12px;color:rgba(255,255,255,.62);cursor:pointer;border:none;background:transparent;width:100%;text-align:left;border-left:3px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif}
+.sidebar-btn:hover{color:var(--white);background:rgba(255,255,255,.05)}
+.sidebar-btn.active{color:var(--white);border-left-color:var(--gold);background:rgba(201,168,76,.08)}
+.sidebar-btn svg{width:15px;height:15px;opacity:.6;flex-shrink:0}
+.sidebar-btn.active svg{opacity:1}
+.sidebar-divider{height:1px;background:rgba(255,255,255,.07);margin:8px 20px}
+.proj-list{padding:4px 0}
+.proj-item{display:flex;align-items:center;gap:8px;padding:6px 20px 6px 24px;font-size:11px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-item:hover{color:rgba(255,255,255,.85)}
+.proj-item.active{color:var(--gold-light);font-weight:500}
+.proj-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,.07);font-size:10px;color:rgba(255,255,255,.28);line-height:1.5}
+
+/* ── MAIN ────────────────────────────────────── */
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:var(--topbar);background:var(--white);border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-title{font-size:15px;font-weight:500;color:var(--gray-800)}
+.topbar-badge{font-size:10px;padding:2px 9px;border-radius:10px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.view-toggle{display:flex;border:1px solid var(--gray-200);border-radius:20px;overflow:hidden;background:var(--white)}
+.vt-btn{font-size:11px;padding:5px 14px;background:transparent;border:none;color:var(--gray-400);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:5px}
+.vt-btn.active{background:var(--navy);color:var(--white)}
+.btn{font-size:11px;padding:5px 13px;border-radius:var(--r8);border:1px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;gap:5px}
+.btn:hover{background:var(--gray-50);border-color:var(--gray-300)}
+.btn-primary{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.btn-primary:hover{background:var(--navy-mid)}
+.content{padding:24px 28px;flex:1}
+
+/* ── LOADING ─────────────────────────────────── */
+#loading{display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:12px}
+.spinner{width:32px;height:32px;border:2px solid var(--gray-200);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SUMMARY CARDS ───────────────────────────── */
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.sum-card{border-radius:var(--r12);padding:14px 16px}
+.sum-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;opacity:.8}
+.sum-num{font-size:28px;font-weight:500;line-height:1;margin-bottom:3px}
+.sum-sub{font-size:10px;opacity:.75}
+
+/* ── PIPELINE STRIP ──────────────────────────── */
+.pipeline-strip{display:flex;border-bottom:1px solid var(--gray-100);margin-bottom:16px;overflow-x:auto;background:var(--white);border-radius:var(--r12) var(--r12) 0 0;box-shadow:var(--shadow)}
+.pipe-tab{flex:1;min-width:80px;padding:10px 6px 12px;text-align:center;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;position:relative}
+.pipe-dot{width:7px;height:7px;border-radius:50%;margin:0 auto 5px}
+.pipe-name{font-size:9px;font-weight:500;line-height:1.25;color:var(--gray-400)}
+.pipe-tab.active .pipe-name{color:var(--gray-800)}
+.pipe-count{font-size:9px;font-weight:500;margin-top:2px}
+
+/* ── FILTER ROW ──────────────────────────────── */
+.filter-row{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filt{font-size:11px;padding:4px 12px;border-radius:12px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-400);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.filt:hover{border-color:var(--gray-300);color:var(--gray-600)}
+.filt.active{background:var(--gray-800);color:var(--white);border-color:var(--gray-800)}
+.filt.red-active{background:var(--red-lt);color:var(--red-txt);border-color:var(--red)}
+.filt.amber-active{background:var(--amber-lt);color:var(--amber-txt);border-color:var(--amber)}
+
+/* ── PROJECT CARDS ───────────────────────────── */
+.proj-cards{display:flex;flex-direction:column;gap:8px}
+.pcard{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--r12);overflow:hidden;cursor:pointer;box-shadow:var(--shadow);transition:box-shadow .15s,border-color .15s}
+.pcard:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);border-color:var(--gray-200)}
+.pcard.open{border-color:var(--gray-300)}
+.pcard.red  .pcard-head{border-left:4px solid var(--red)}
+.pcard.amber.pcard-head,.pcard.amber > .pcard-head{border-left:4px solid var(--amber)}
+.pcard.green > .pcard-head{border-left:4px solid var(--green)}
+.pcard-head{padding:12px 16px;display:flex;align-items:flex-start;gap:10px;border-left:4px solid transparent;transition:background .1s}
+.pcard:hover .pcard-head{background:var(--gray-50)}
+.pcard.open .pcard-head{border-bottom:1px solid var(--gray-100)}
+.pc-main{flex:1;min-width:0}
+.pc-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px}
+.pc-name{font-size:13px;font-weight:500;color:var(--gray-800)}
+.pc-client{font-size:11px;color:var(--gray-400)}
+.pc-pills{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.badge{font-size:10px;padding:2px 9px;border-radius:10px;font-weight:500;white-space:nowrap}
+.days-badge{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.prog-mini{display:flex;align-items:center;gap:5px;margin-left:auto}
+.prog-bar-mini{width:56px;height:4px;background:var(--gray-100);border-radius:2px;overflow:hidden}
+.prog-fill-mini{height:100%;border-radius:2px;transition:width .3s}
+.alert-row{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.alert-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:var(--r8);border:1px solid}
+.alert-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+.alert-body{flex:1}
+.alert-title{font-size:11px;font-weight:500;line-height:1.3}
+.alert-sub{font-size:10px;margin-top:2px;opacity:.8;line-height:1.4}
+.md-req{font-size:9px;padding:1px 6px;border-radius:5px;background:var(--red-lt);color:var(--red-txt);font-weight:500;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── EXPANDED BODY ───────────────────────────── */
+.pcard-body{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pb-title{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-400);margin-bottom:8px}
+.pcl-item{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--gray-50);font-size:11px}
+.pcl-item:last-child{border-bottom:none}
+.pcl-tick{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--gray-200)}
+.pcl-tick.done{background:var(--green-lt);border-color:transparent}
+.pcl-tick.done::after{content:'✓';font-size:8px;color:var(--green-txt)}
+.pcl-text{flex:1;color:var(--gray-800);line-height:1.3}
+.pcl-text.done{text-decoration:line-through;color:var(--gray-300)}
+.blocker-bang{font-size:9px;padding:1px 5px;border-radius:5px;background:var(--red-lt);color:var(--red-txt);font-weight:500}
+.pcard-btns{padding:8px 16px 10px;border-top:1px solid var(--gray-50);display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── OWNER VIEW ──────────────────────────────── */
+.owner-wrap{}
+.owner-proj-pills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
+.opill{font-size:11px;padding:4px 12px;border-radius:12px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-400);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.opill.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.stage-tabs-row{display:flex;overflow-x:auto;border-bottom:1px solid var(--gray-100);margin-bottom:16px;background:var(--white);border-radius:var(--r12) var(--r12) 0 0;box-shadow:var(--shadow)}
+.stab{flex:1;min-width:80px;padding:9px 4px 11px;text-align:center;cursor:pointer;border-bottom:2px solid transparent;transition:all .12s}
+.stab-dot{width:6px;height:6px;border-radius:50%;margin:0 auto 4px}
+.stab-name{font-size:9px;font-weight:500;color:var(--gray-400);line-height:1.2}
+.stab-now{font-size:8px;font-weight:500;margin-top:2px}
+.stab.active .stab-name{color:var(--gray-800)}
+.owner-panel{background:var(--white);border:1px solid var(--gray-100);border-radius:0 0 var(--r12) var(--r12);box-shadow:var(--shadow);overflow:hidden}
+.op-head{padding:10px 16px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.op-stage-name{font-size:14px;font-weight:500;color:var(--gray-800)}
+.op-pct{font-size:11px;color:var(--gray-400);margin-left:auto}
+.gates-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px;border-bottom:1px solid var(--gray-100)}
+.gate-box{border-radius:var(--r8);padding:8px 10px}
+.gate-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.gate-txt{font-size:11px;font-weight:500;line-height:1.4}
+.prog-row-full{padding:8px 16px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;gap:10px}
+.prog-bar-full{flex:1;height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden}
+.prog-fill-full{height:100%;border-radius:3px;transition:width .3s}
+.groups{padding:8px 16px}
+.grp{border:1px solid var(--gray-100);border-radius:var(--r8);margin-bottom:7px;overflow:hidden}
+.grp:last-child{margin-bottom:0}
+.grp-head{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--gray-50);cursor:pointer;border-bottom:1px solid var(--gray-100)}
+.grp-head.collapsed{border-bottom:none}
+.grp-icon{font-size:13px;color:var(--gray-400)}
+.grp-name{font-size:11px;font-weight:500;color:var(--gray-800)}
+.grp-stats{font-size:10px;color:var(--gray-400);margin-left:auto}
+.q-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--gray-50);cursor:pointer;transition:background .1s}
+.q-row:last-child{border-bottom:none}
+.q-row:hover{background:var(--gray-50)}
+.qtick{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--gray-200);font-size:9px;margin-top:1px}
+.qtick.y{background:var(--green-lt);border-color:transparent;color:var(--green-txt)}
+.qtick.n{background:var(--red-lt);border-color:transparent;color:var(--red-txt)}
+.qtick.na{background:var(--gray-50);color:var(--gray-400)}
+.qtick.cond{background:var(--amber-lt);border-color:transparent;color:var(--amber-txt)}
+.qtick.u{background:transparent;border:1px dashed var(--gray-200);color:var(--gray-300)}
+.qbody{flex:1}
+.qtext{font-size:11px;color:var(--gray-800);line-height:1.4}
+.qsub{font-size:10px;color:var(--gray-400);margin-top:2px;line-height:1.4}
+.qcrit{font-size:9px;padding:1px 6px;border-radius:6px;font-weight:500;flex-shrink:0;white-space:nowrap;align-self:flex-start;margin-top:2px}
+.q-expand{padding:8px 10px 10px 35px;display:none;border-bottom:1px solid var(--gray-50);background:var(--gray-50)}
+.q-row.open+.q-expand{display:block}
+.qdetail{font-size:10px;color:var(--gray-600);line-height:1.6;margin-bottom:8px}
+.qbtns{display:flex;gap:5px;flex-wrap:wrap}
+.qb{font-size:11px;padding:4px 12px;border-radius:var(--r8);border:1px solid;cursor:pointer;background:transparent;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .12s}
+.qb.y{border-color:var(--green);color:var(--green-txt)}.qb.y:hover{background:var(--green-lt)}
+.qb.n{border-color:var(--red);color:var(--red-txt)}.qb.n:hover{background:var(--red-lt)}
+.qb.na{border-color:var(--gray-200);color:var(--gray-400)}.qb.na:hover{background:var(--gray-50)}
+.cond-block{background:var(--amber-lt);border:1px solid var(--amber);border-radius:var(--r8);padding:9px 11px;margin-top:6px}
+.cond-q{font-size:11px;font-weight:500;color:var(--amber-txt);margin-bottom:7px}
+.cond-btns{display:flex;gap:6px;flex-wrap:nowrap}
+.cond-btn{font-size:11px;padding:4px 12px;border-radius:var(--r8);border:1px solid;cursor:pointer;background:transparent;font-family:'DM Sans',sans-serif;font-weight:500}
+.cond-btn.req{border-color:var(--amber);color:var(--amber-txt)}.cond-btn.req:hover{background:var(--amber-lt)}
+.cond-btn.skip{border-color:var(--gray-200);color:var(--gray-400)}.cond-btn.skip:hover{background:var(--gray-50)}
+.status-strip{padding:8px 16px;display:flex;align-items:center;gap:7px;border-top:1px solid var(--gray-100)}
+.ss-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cl-section{padding:8px 16px;border-top:1px solid var(--gray-100)}
+.cl-title{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-400);margin-bottom:7px}
+.cl-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-100);border-radius:var(--r8);margin-bottom:4px}
+.cl-row:last-child{margin-bottom:0}
+.cl-badge{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;white-space:nowrap}
+.cl-desc{flex:1;font-size:10px;color:var(--gray-400)}
+.cl-open{font-size:10px;padding:3px 10px;border-radius:var(--r8);border:1px solid var(--gray-300);background:var(--white);color:var(--gray-800);cursor:pointer;font-family:'DM Sans',sans-serif}
+.cl-open:hover{background:var(--gray-50)}
+.fin-note{margin:0 16px 12px;padding:8px 10px;border-radius:var(--r8);border-left:3px solid var(--gold);background:var(--gold-pale);font-size:10px;color:var(--gray-600);line-height:1.6}
+.fin-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:2px}
+
+/* ── MODAL ───────────────────────────────────── */
+.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,31,61,.4);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal{background:var(--white);border-radius:var(--r16);padding:20px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h3{font-size:14px;font-weight:500;color:var(--gray-800);margin-bottom:14px}
+.modal label{font-size:11px;color:var(--gray-400);display:block;margin-bottom:3px;margin-top:10px}
+.modal input,.modal select{width:100%;padding:7px 10px;border:1px solid var(--gray-200);border-radius:var(--r8);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--gray-800);background:var(--white);outline:none}
+.modal input:focus,.modal select:focus{border-color:var(--navy)}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+
+/* ── SAVING INDICATOR ────────────────────────── */
+.save-indicator{position:fixed;bottom:20px;right:20px;background:var(--navy);color:var(--white);font-size:11px;padding:8px 14px;border-radius:var(--r8);z-index:200;display:none;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.save-indicator.show{display:flex}
+
+/* ── EMPTY STATE ─────────────────────────────── */
+.empty{text-align:center;padding:3rem 1rem;color:var(--gray-400);font-size:13px}
+
+/* ── GRID VIEW ───────────────────────────────── */
+.grid-wrap{overflow-x:auto}
+.grid-legend{display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 0}
+.gl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--gray-600)}
+.gl-dot{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0}
+.grid-proj-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.grid-pill{font-size:11px;padding:4px 12px;border-radius:12px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .12s;font-family:'DM Sans',sans-serif}
+.grid-pill.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.gtable{border-collapse:collapse;min-width:100%}
+.gtable th{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400);padding:6px 4px;text-align:center;border-bottom:1px solid var(--gray-100);white-space:nowrap;min-width:52px}
+.gtable th.th-label{text-align:left;min-width:130px;padding-left:0;color:var(--gray-600)}
+.gtable th.th-stage{cursor:pointer;transition:all .12s;padding:6px 3px}
+.gtable th.th-stage:hover{background:var(--gray-50)}
+.gtable th.th-stage.cur{color:var(--navy)}
+.th-dot-g{width:7px;height:7px;border-radius:50%;margin:0 auto 3px}
+.th-now-g{font-size:8px;margin-top:2px;font-weight:600}
+.gtable tr.g-group-row td{background:var(--gray-50);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400);padding:5px 4px;border-top:1px solid var(--gray-100);border-bottom:1px solid var(--gray-100);text-align:center}
+.gtable tr.g-group-row td.g-grp-label{text-align:left;padding-left:2px;display:flex;align-items:center;gap:5px}
+.gtable tr.g-action-row td{border-bottom:1px solid var(--gray-50);padding:1px 2px}
+.gtable tr.g-action-row td.g-row-label{font-size:10px;color:var(--gray-800);padding:5px 6px 5px 2px;line-height:1.3;vertical-align:middle;font-style:normal}
+.gtable tr.g-action-row td.g-row-label.cond-lbl{font-style:italic;color:var(--gray-400)}
+.gcell{width:52px;text-align:center;vertical-align:middle;cursor:pointer;transition:background .1s;position:relative}
+.gcell-readonly{width:52px;text-align:center;vertical-align:middle;cursor:default}
+.gcell.next-stage{background:#E6F1FB08}
+.gcell:hover{background:var(--gray-50)}
+.gcell.highlighted{background:#E6F1FB20}
+.gcell.cur-stage{background:#FAEEDA15}
+.tick{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:3px auto;font-size:10px;transition:all .2s;position:relative}
+.tick.done{background:var(--green-lt);color:var(--green-txt)}
+.tick.nope{background:var(--red-lt);color:var(--red-txt)}
+.tick.na{background:var(--gray-50);color:var(--gray-300);border:1px solid var(--gray-200)}
+.tick.cond{background:var(--amber-lt);color:var(--amber-txt)}
+.tick.unanswered{background:transparent;border:1.5px dashed var(--gray-200);color:transparent}
+.tick.unanswered::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--gray-200);display:block;margin:auto}
+.tick.blocker{box-shadow:0 0 0 2px var(--red)}
+.g-count{font-size:9px;color:var(--gray-400);font-weight:500}
+.g-count.has-done{color:var(--green-txt)}
+/* Cell popup */
+.cell-popup{position:absolute;z-index:200;background:var(--white);border:1px solid var(--gray-200);border-radius:var(--r12);padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:200px;left:50%;transform:translateX(-50%);top:calc(100% + 6px);text-align:left}
+.cell-popup-title{font-size:11px;font-weight:500;color:var(--gray-800);margin-bottom:3px;line-height:1.4}
+.cell-popup-stage{font-size:10px;color:var(--gray-400);margin-bottom:10px}
+.cell-popup-btns{display:flex;gap:6px;flex-wrap:nowrap;align-items:center}
+.cpb{font-size:11px;padding:5px 12px;border-radius:var(--r8);border:1px solid;cursor:pointer;background:transparent;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .12s;white-space:nowrap}
+.cpb.y{border-color:var(--green);color:var(--green-txt)}.cpb.y:hover{background:var(--green-lt)}
+.cpb.n{border-color:var(--red);color:var(--red-txt)}.cpb.n:hover{background:var(--red-lt)}
+.cpb.na{border-color:var(--gray-200);color:var(--gray-400)}.cpb.na:hover{background:var(--gray-50)}
+.cond-confirm{background:var(--amber-lt);border:1px solid var(--amber);border-radius:var(--r8);padding:9px 10px;margin-bottom:8px}
+.cond-q{font-size:11px;font-weight:500;color:var(--amber-txt);margin-bottom:6px}
+.cond-btns{display:flex;gap:6px;flex-wrap:nowrap}
+.cdb{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid;cursor:pointer;background:transparent;font-family:'DM Sans',sans-serif;font-weight:500}
+.cdb.req{border-color:var(--amber);color:var(--amber-txt)}.cdb.req:hover{background:var(--amber-lt)}
+.cdb.skip{border-color:var(--gray-200);color:var(--gray-400)}.cdb.skip:hover{background:var(--gray-50)}
+
+
+.sidebar-stage-group{margin-bottom:4px}
+.sidebar-stage-label{display:flex;align-items:center;gap:6px;padding:8px 20px 3px;font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.sidebar-stage-count{margin-left:auto;font-size:9px;background:rgba(255,255,255,.08);border-radius:8px;padding:1px 6px;color:rgba(255,255,255,.4)}
+.proj-item{padding:5px 20px 5px 28px}
+
+.sidebar-stage-label{user-select:none}
+.sidebar-stage-label:hover{background:rgba(255,255,255,.04)}
+.proj-item{padding:3px 14px 3px 22px;font-size:11px;border-radius:0;transition:background .1s;cursor:pointer}
+.proj-item.active{color:var(--gold-light);font-weight:500;background:rgba(201,168,76,.1)}
+.proj-item:hover{background:rgba(255,255,255,.06)}
+
+
+/* ══ MY PROJECT TAB — handbook v1.3 style ════════════════════════ */
+.action-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;margin:0 0 4px;border:1px solid #eeece8}
+.action-table thead{background:#0f1f3d;color:#fff}
+.action-table th{padding:10px 12px;text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#fff}
+.action-table td{padding:9px 12px;border-top:1px solid #eeece8;vertical-align:top;color:#4a4842;line-height:1.55;font-size:12px}
+.action-table tbody tr:hover td{background:#f8f7f5}
+.action-table .group-row td{background:#faf3e0;color:#92400e;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:7px 12px;border-top:none}
+.action-table .gate-row td{background:#fff5f5;color:#7f1d1d;font-weight:600;padding:9px 12px}
+.action-table .check{text-align:center;width:36px;padding:8px 6px;cursor:pointer;user-select:none;vertical-align:middle;border-top:1px solid #eeece8}
+.action-table .check .box{display:inline-block;width:18px;height:18px;border-radius:4px;border:1.5px solid #c0bcb3;background:#fff;position:relative;transition:all .15s;vertical-align:middle}
+.action-table .check:hover .box{border-color:#0f1f3d;background:#f8f7f5}
+.action-table .check.done .box{background:#0f1f3d;border-color:#0f1f3d}
+.action-table .check.done .box::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.action-table tr.done-row td{color:#c0bcb3}
+.action-table tr.done-row td:nth-child(3){text-decoration:line-through;text-decoration-color:#c0bcb3;text-decoration-thickness:1px}
+.action-table .num{color:#9e9b93;font-weight:600;text-align:center;width:28px;font-size:11px}
+.action-table .role{font-weight:500;color:#0f1f3d;white-space:nowrap;font-size:11px}
+.action-table .tool{color:#6b6860;white-space:nowrap;font-size:11px}
+.action-table .notes-cell{color:#9e9b93;font-size:11px;line-height:1.5}
+.act-detail{font-size:11px;color:#6b6860;line-height:1.6;margin-top:6px;padding:8px 10px;background:#f8f7f5;border-radius:5px;border-left:2px solid #d8d5ce}
+.act-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.a-btn{font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid;cursor:pointer;background:transparent;font-weight:500;font-family:'DM Sans',sans-serif;transition:background .12s}
+.a-btn-y{border-color:#2d6a4f;color:#1b4332}.a-btn-y:hover{background:#e8f5ee}
+.a-btn-n{border-color:#991b1b;color:#7f1d1d}.a-btn-n:hover{background:#fee2e2}
+.a-btn-na{border-color:#c0bcb3;color:#6b6860}.a-btn-na:hover{background:#f8f7f5}
+.act-sp-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid #B5D4F4;background:#E6F1FB;color:#0C447C;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;margin-top:8px}
+.act-sp-btn:hover{background:#d0e7f9}
+.act-stage-banner{border-radius:10px;padding:18px 22px;margin-bottom:14px;color:#fff;overflow:hidden}
+.act-banner-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;opacity:.85;margin-bottom:4px}
+.act-banner-title{font-family:'DM Serif Display',serif;font-size:24px;margin-bottom:8px;line-height:1.2}
+.act-banner-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;margin-top:6px;opacity:.95}
+.act-finance{background:#faf3e0;border-left:3px solid #c9a84c;padding:10px 14px;border-radius:0 6px 6px 0;font-size:12px;color:#78350f;line-height:1.6;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
+.act-card{background:#fff;border:1px solid #eeece8;border-radius:8px;padding:14px 16px;margin-bottom:12px}
+.act-card-title{font-size:12px;font-weight:600;color:#2c2b27;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.act-dot{width:7px;height:7px;border-radius:50%;background:#c9a84c;flex-shrink:0}
+.act-prog{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.act-prog-bar{flex:1;height:5px;background:#eeece8;border-radius:3px;overflow:hidden}
+.act-prog-fill{height:100%;border-radius:3px;transition:width .3s}
+/* ══ /MY PROJECT TAB ══════════════════════════════════════════════ */
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ──────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-name">Trimstone</div>
+    <div class="sidebar-logo-sub">Pipeline dashboard</div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Views</div>
+    <button class="sidebar-btn active" id="sb-owner" onclick="setMainView('owner')">
+      <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      My project
+    </button>
+
+    <button class="sidebar-btn" id="sb-grid" onclick="setMainView('grid')">
+      <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+      Pipeline grid
+    </button>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Projects</div>
+    <div class="proj-list" id="sidebar-projects"></div>
+  </div>
+
+  <div class="sidebar-footer">
+    Trimstone Partners · v1.0<br>
+    Connected to Supabase
+  </div>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────────── -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="topbar-title">Pipeline grid</div>
+      <div class="topbar-badge" id="topbar-badge" style="background:var(--navy-mid);color:var(--white)"></div>
+    </div>
+    <div class="topbar-right">
+      <div class="view-toggle">
+        <button class="vt-btn" id="vbtn-owner" onclick="setMainView('owner')">My project</button>
+        <button class="vt-btn active" id="vbtn-grid" onclick="setMainView('grid')">Grid view</button>
+      </div>
+      <div id="user-badge" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray-400);padding:0 6px"></div>
+      <button class="btn" onclick="openAdd()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="6" y1="1" x2="6" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Add project
+      </button>
+      <button class="btn btn-primary" onclick="loadDashboard()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 112 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 6V3M10 6H7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <div style="font-size:12px;color:var(--gray-400)">Loading projects…</div>
+    </div>
+
+    <!-- Owner view -->
+    <div id="owner-view" style="display:none">
+      <div id="owner-pills" style="display:none"></div>
+      <div id="stage-tabs" style="display:none"></div>
+      <div class="owner-panel" id="owner-panel"></div>
+    </div>
+
+    <!-- Partners view -->
+    <div id="partners-view" style="display:none">
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="filter-row" id="filter-row"></div>
+      <div class="pipeline-strip" id="pipeline-strip"></div>
+      <div class="proj-cards" id="proj-cards"></div>
+    </div>
+
+    <!-- Grid view -->
+    <div id="grid-view" style="display:none">
+      <div id="grid-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modal" style="display:none" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Add project</h3>
+    <label>Project name (deal name)</label>
+    <input id="m-name" type="text" placeholder="e.g. Chief Transformation Officer">
+    <label>Client (account name)</label>
+    <input id="m-client" type="text" placeholder="e.g. NHBC">
+    <label>Lead partner (deal owner)</label>
+    <input id="m-lp" type="text" placeholder="e.g. Will">
+    <label>Stage</label>
+    <select id="m-stage">
+      <option value="discussions">In discussions</option>
+      <option value="scoping">Prospecting & scoping</option>
+      <option value="pricing">Pricing & proposing</option>
+      <option value="contracting">Contracting</option>
+      <option value="executing">Executing</option>
+      <option value="closing">Closing down (won)</option>
+      <option value="hold">On hold</option>
+    </select>
+    <div class="mbtns">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addProject()">Add project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save indicator -->
+<div class="save-indicator" id="save-ind">
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 3L5 9L2 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  Saved
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIGURATION — replace with your values
+// ══════════════════════════════════════════════
+const SUPABASE_URL = 'https://zdlqjyszqlyxmppodgyi.supabase.co'
+const SUPABASE_REST = 'https://' + 'zdlqjyszqlyxmppodgyi' + '.supabase.co/rest/v1'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkbHFqeXN6cWx5eG1wcG9kZ3lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyOTQwNjMsImV4cCI6MjA5Mjg3MDA2M30.TzZ1jxgYL4x4WvCgMPb9guTI8LE0nzo9svn_amr9Uok' // legacy anon JWT
+
+// ── DEMO MODE ─────────────────────────────────
+// Works immediately without Supabase credentials.
+// Replace SUPABASE_URL and SUPABASE_KEY above to go live.
+const DEMO_PROJECTS = [
+  {id:'NHBC-CTO',    deal_name:'Chief Transformation Officer', account_name:'NHBC',    deal_owner:'Will',  current_stage:'contracting', updated_at:'2026-05-19'},
+  {id:'Barclays-DS', deal_name:'Digital Strategy Review',      account_name:'Barclays',deal_owner:'Miguel',current_stage:'executing',   updated_at:'2026-05-12'},
+  {id:'Aviva-OM',    deal_name:'Operating Model Design',       account_name:'Aviva',   deal_owner:'Will',  current_stage:'pricing',     updated_at:'2026-05-28'},
+  {id:'GSK-ME',      deal_name:'Market Entry Assessment',      account_name:'GSK',     deal_owner:'James', current_stage:'discussions', updated_at:'2026-05-20'},
+  {id:'Lloyds-RC',   deal_name:'Regulatory Change Programme',  account_name:'Lloyds',  deal_owner:'Iryna', current_stage:'scoping',     updated_at:'2026-05-30'},
+  {id:'BT-WT',       deal_name:'Workforce Transformation',     account_name:'BT Group',deal_owner:'Will',  current_stage:'hold',        updated_at:'2026-05-01'},
+]
+const DEMO_TICKS = [
+  {project_id:'NHBC-CTO',    stage_key:'contracting', action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'Barclays-DS', stage_key:'executing',   action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'Barclays-DS', stage_key:'executing',   action_id:'torr1',is_done:true,  is_na:false},
+  {project_id:'Barclays-DS', stage_key:'executing',   action_id:'xero1',is_done:true,  is_na:false},
+  {project_id:'Barclays-DS', stage_key:'executing',   action_id:'tm1',  is_done:true,  is_na:false},
+  {project_id:'Aviva-OM',    stage_key:'pricing',     action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'Aviva-OM',    stage_key:'pricing',     action_id:'cl1',  is_done:true,  is_na:false},
+  {project_id:'GSK-ME',      stage_key:'discussions', action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'Lloyds-RC',   stage_key:'scoping',     action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'Lloyds-RC',   stage_key:'scoping',     action_id:'crm2', is_done:true,  is_na:false},
+  {project_id:'Lloyds-RC',   stage_key:'scoping',     action_id:'torr1',is_done:true,  is_na:false},
+  {project_id:'BT-WT',       stage_key:'hold',        action_id:'crm1', is_done:true,  is_na:false},
+  {project_id:'BT-WT',       stage_key:'hold',        action_id:'crm2', is_done:true,  is_na:false},
+]
+const DEMO_MODE = SUPABASE_URL.includes('YOUR-PROJECT')
+
+// ══════════════════════════════════════════════
+// STAGE DEFINITIONS
+// ══════════════════════════════════════════════
+const STAGES = [
+  {id:'discussions', short:'In Disc.',    color:'#378ADD',bg:'#E6F1FB',tc:'#0C447C'},
+  {id:'scoping',     short:'Scoping',     color:'#7F77DD',bg:'#EEEDFE',tc:'#3C3489'},
+  {id:'pricing',     short:'Pricing',     color:'#1D9E75',bg:'#E1F5EE',tc:'#085041'},
+  {id:'contracting', short:'Contracting', color:'#EF9F27',bg:'#FAEEDA',tc:'#633806'},
+  {id:'executing',   short:'Executing',   color:'#639922',bg:'#EAF3DE',tc:'#27500A'},
+  {id:'closing',     short:'Closing',     color:'#2d6a4f',bg:'#d1fae5',tc:'#04342C'},
+  {id:'hold',        short:'On Hold',     color:'#BA7517',bg:'#FAEEDA',tc:'#412402'},
+  {id:'lost',        short:'Closed Lost', color:'#888780',bg:'#F1EFE8',tc:'#2C2C2A'},
+]
+// Map Zoho stage names → dashboard stage IDs
+const ZOHO_STAGE_MAP = {
+  'in discussions':           'discussions',
+  'prospecting and scoping':  'scoping',
+  'prospecting & scoping':    'scoping',
+  'pricing and proposing':    'pricing',
+  'pricing & proposing':      'pricing',
+  'contracting':              'contracting',
+  'executing':                'executing',
+  'executing_project live':   'executing',
+  'executing - project live': 'executing',
+  'closing down_won':         'closing',
+  'closing down (won)':       'closing',
+  'closing down won':         'closing',
+  'on hold':                  'hold',
+  'closed lost':              'lost',
+  'pricing':                  'pricing',
+  'scoping':                  'scoping',
+  'executing (project live)': 'executing',
+  'closing down_won':         'closing',
+  'closing down (won)':       'closing',
+}
+
+function normaliseStage(raw) {
+  if (!raw) return 'discussions'
+  const lower = raw.toLowerCase().trim()
+  return ZOHO_STAGE_MAP[lower] || lower
+}
+
+// SharePoint links — appear after ticking Yes on specific actions
+// IDs match OWNER_STAGES exactly
+const ACTION_LINKS = {
+  'cl1':   { label: 'SOWs folder',                  url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgBgVQE-vq1nTonnbSe9F-n4ATNqUdA5jTC0g-wf8iyAvMk?e=vKhh6y', icon: '📄' },
+  'cl5':   { label: 'Pricing Sheets (Confidential)', url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgAmOz6OPDZ8QJVgZUEAhCmwAb1kBpWvstZHYH8k7dkJhYU?e=mY2ctu', icon: '💰' },
+  'tm2':   { label: 'NDAs folder',                   url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgCxvz1pu3NmRqql5x-DHL1wAXglvNaZvxtH8skMsbsivZE?e=te7YSV', icon: '📝' },
+  'tm1':   { label: 'MSAs folder (Confidential)',    url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgDZTtNUMtNgSLcu_Tp5NakNATb2qwvDcQP-zADEQepUI-k?e=yFmYHK', icon: '📝' },
+  'torr1': { label: 'Time Sheets',                   url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgA92S4E821YRb1At_4mD6eKAQKc6YEy8ZudC6aRssCTosA?e=PqBRW2', icon: '⏱' },
+}
+// KYC is conditional (cl2 in contracting) — shown separately
+const KYC_LINK = { label: 'KYC folder', url: 'https://trimstone.sharepoint.com/:f:/s/10122-04Torr/IgCpQWfWBBBzSYc1gmDVkS9zAU_p3eUKayMmto0MYfgidPE?e=l06yHU', icon: '🔒' }
+
+const stFor = id => STAGES.find(s=>s.id===id) || STAGES[0]
+
+const LP_C = {
+  Will:  {bg:'#E6F1FB',tc:'#0C447C'},
+  Miguel:{bg:'#EEEDFE',tc:'#3C3489'},
+  James: {bg:'#E1F5EE',tc:'#085041'},
+  Iryna: {bg:'#EAF3DE',tc:'#27500A'},
+}
+const GI = {'Zoho CRM':'🗄','Torr Portal':'📋','Client':'🏢','Team':'👥','Xero':'🧾','Finance':'💰'}
+
+// ══════════════════════════════════════════════
+// STAGE ASSESSMENT DATA
+// ══════════════════════════════════════════════
+const OWNER_STAGES = {
+  discussions:{
+    full:'In discussions',
+    entry:'A specific project opportunity has been identified',
+    exit:'Client requests further engagement — RFI, proposal, or approach shaping',
+    finance:'All travel and related expenses are charged to the individual Partner\'s personal cost code. No reimbursement is made at this stage.',
+    roles:[{label:'Lead Partner',color:'#E6F1FB',tc:'#0C447C',desc:'Create and manage the deal in CRM'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Create deal in Zoho CRM linked to Account and Contact',owner:'Lead Partner',sub:'Deal name must reflect a specific project, not just a client name',detail:'Lead Partner · Zoho CRM · Deal name must reflect a specific project, not just a client name',blocker:true,autoYes:true},
+        {id:'crm2',text:'Assign Lead Partner as deal owner in CRM',owner:'Lead Partner',sub:'LP responsible for pipeline status',detail:'Lead Partner · Zoho CRM · LP responsible for pipeline status',blocker:false},
+        {id:'cl1',text:'Record key client contacts and decision maker',owner:'Lead Partner',sub:'At minimum one primary contact must be recorded',detail:'Lead Partner · Zoho CRM · At minimum one primary contact must be recorded',blocker:false},
+        {id:'crm2b',text:'Capture brief project description for internal clarity in Zoho Deal',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Zoho CRM',blocker:false},
+        {id:'crm4',text:'Set Next Step and Next Step Date in CRM',owner:'Lead Partner',sub:'No deal should exist without a next step recorded',detail:'Lead Partner · Zoho CRM · No deal should exist without a next step recorded',blocker:true},
+        {id:'crm3',text:'Confirm Account priority (H/M/L) in CRM',owner:'Lead Partner',sub:'Triggers Torr Portal client visibility',detail:'Lead Partner · Zoho CRM · Triggers Torr Portal client visibility',blocker:true},
+      ]},
+      {name:'Torr Portal',qs:[
+        {id:'torr_store',text:'Store early meeting notes in Client → Documents-03 → \'Client meetings\'',owner:'Lead Partner',sub:'Maintain minimal hygiene only — no full team or workspace required yet',detail:'Lead Partner · Torr Portal · Maintain minimal hygiene only — no full team or workspace required yet',blocker:false},
+      ]},
+    ]
+  },
+  scoping:{
+    full:'Prospecting & scoping',
+    entry:'Client requested further engagement (RFI / approach request)',
+    exit:'Trimstone is preparing a formal commercial proposition',
+    finance:'Core Partners are not reimbursed for time, effort, or personal costs. Proposal costs are borne collectively by the Core Partner group.',
+    roles:[{label:'Lead Partner',color:'#EEEDFE',tc:'#3C3489',desc:'Workspace setup, CRM, approach framing'},{label:'Co-owner / Core Partner',color:'#EEEDFE',tc:'#534AB7',desc:'Delivery hypothesis & proposal cost agreement'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update deal stage to \'Prospecting & Scoping\'',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Zoho CRM',blocker:true,autoYes:true},
+        {id:'crm2',text:'Record core partner team as Co-Owners — agree to share proposal costs if deal does not materialise',owner:'Lead Partner',sub:'Co-owners share proposal costs proportionally',detail:'Lead Partner · Zoho CRM · Co-owners share proposal costs proportionally',blocker:true,conditional:true},
+        {id:'crm3',text:'Enter expected project start date in CRM',owner:'Lead Partner',sub:'Set far enough out to allow negotiations',detail:'Lead Partner · Zoho CRM · Set far enough out to allow negotiations',blocker:false},
+        {id:'torr1',text:'Project workspace and project code auto-created in Torr',owner:'System (Torr)',sub:'Triggered automatically on stage change',detail:'System (Torr) · Torr Portal · Triggered automatically on stage change',blocker:true},
+      ]},
+      {name:'Torr Portal',qs:[
+        {id:'torr2',text:'Upload discovery notes, meeting notes, and client materials into project workspace',owner:'Lead Partner',sub:'Project workspace is the authoritative storage from this stage',detail:'Lead Partner · Torr Portal · Project workspace is the authoritative storage from this stage',blocker:false},
+        {id:'disc1',text:'Identify delivery hypotheses and outline approach',owner:'LP + Core Partners',sub:'Responsible: LP + Core Partners',detail:'LP + Core Partners · —',blocker:false},
+        {id:'disc2',text:'Identify potential delivery team members or SMEs',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'disc3',text:'Prepare outline approach / proposal framing materials',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr / TAIA',blocker:false},
+        {id:'disc4',text:'Identify any non-core Partner/Supplier supporting the proposal — add as team member in Torr',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr Portal',blocker:false},
+        {id:'disc5',text:'If third-party expenses required: LP coordinates with MD; once approved, grant Xero access and link expenses to LP code',owner:'LP + MD + Miguel + Filip',sub:'Responsible: LP + MD + Miguel + Filip',detail:'LP + MD + Miguel + Filip · Torr / Xero',blocker:false},
+      ]},
+    ]
+  },
+  pricing:{
+    full:'Pricing & proposing',
+    entry:'Trimstone is preparing a formal or semi-formal proposal (RFP, written proposal, or structured commercial discussions)',
+    exit:'Pricing Sheet v4 MD sign-off + client email confirmation of award',
+    finance:'Partners may transfer legitimate prior personal expenses to the project code only at the Executing stage.',
+    roles:[{label:'Lead Partner',color:'#E1F5EE',tc:'#085041',desc:'Pricing sheet owner — v1, v3, v4 prep'},{label:'Co-owner / Core Partner',color:'#E1F5EE',tc:'#0F6E56',desc:'Margin & staffing input'},{label:'Consulting MD',color:'#9FE1CB',tc:'#085041',desc:'v2 & v4 sign-off — required before external sharing'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Deal stage updated to \'Pricing & Proposing\'',owner:'Lead Partner',sub:'Stage updates in Torr automatically',detail:'Lead Partner · Zoho CRM / Torr · Stage updates in Torr automatically',blocker:true,autoYes:true},
+      ]},
+      {name:'Client',qs:[
+        {id:'cl1',text:'Complete Pricing Sheet v1: project definition, delivery model, roles, rates, commercial assumptions',owner:'Lead Partner',sub:'Template received via email notification',detail:'Lead Partner · Pricing Sheet · Template received via email notification',blocker:false},
+        {id:'cl1b',text:'Document commercial assumptions, scope boundaries, and exclusions',owner:'Lead Partner',sub:'Carry assumptions forward into the proposal',detail:'Lead Partner · Pricing Sheet · Carry assumptions forward into the proposal',blocker:false},
+        {id:'cl1c',text:'Confirm margin expectations and platform fee assumptions',owner:'LP + Core Partners',sub:'Any variation to standard platform fee requires MD sign-off',detail:'LP + Core Partners · Pricing Sheet · Any variation to standard platform fee requires MD sign-off',blocker:false},
+        {id:'cl1d',text:'Validate delivery model and staffing assumptions with core partners',owner:'LP + Core Partners',sub:'Responsible: LP + Core Partners',detail:'LP + Core Partners · —',blocker:false},
+        {id:'cl1e',text:'Add internal staff names and roles in the Pricing Sheet',owner:'LP + Core Partners',sub:'Staffing ratios not required at this stage',detail:'LP + Core Partners · Pricing Sheet · Staffing ratios not required at this stage',blocker:false},
+        {id:'cl1f',text:'Identify contractor staff from approved agencies (Barton, Eames, Tarka)',owner:'LP + Core Partners',sub:'Add full names and roles',detail:'LP + Core Partners · Pricing Sheet · Add full names and roles',blocker:false},
+        {id:'cl1g',text:'Store pricing sheet v1 and commercial assumptions in project workspace',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr Portal',blocker:false},
+        {id:'cl2_sub',text:'Submit pricing sheet v1 to Consulting MD for approval to move to v2',owner:'Lead Partner',sub:'v2 is the minimum version permitted for external sharing',detail:'Lead Partner · Torr / Email · v2 is the minimum version permitted for external sharing',blocker:true},
+        {id:'cl2',text:'Consulting MD reviews and approves pricing sheet v2',owner:'Consulting MD',sub:'MD approval required before any external sharing',detail:'Consulting MD · Pricing Sheet / Email · MD approval required before any external sharing',blocker:true},
+        {id:'cl2b',text:'Prepare proposal / RFP response using Torr tools (Proposal Generator, TAIA, PPT Generator)',owner:'Lead Partner',sub:'Align proposal scope with pricing sheet assumptions',detail:'Lead Partner · Torr / TAIA · Align proposal scope with pricing sheet assumptions',blocker:false},
+        {id:'cl2c',text:'Align proposal scope with pricing sheet assumptions',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'cl2d',text:'Share proposal externally only once pricing sheet v2 is approved',owner:'Lead Partner',sub:'No external sharing below v2 under any circumstances',detail:'Lead Partner · — · No external sharing below v2 under any circumstances',blocker:false},
+        {id:'cl2e',text:'Store approved pricing sheet v2 and commercial assumptions in project workspace',owner:'Lead Partner',sub:'All versions v1–v4 must be stored',detail:'Lead Partner · Torr Portal · All versions v1–v4 must be stored',blocker:false},
+        {id:'cl3',text:'Capture negotiation changes or commercial concessions',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Pricing Sheet',blocker:false},
+        {id:'cl3b',text:'Update pricing sheet to v3 once client agrees scope and commercials',owner:'Lead Partner',sub:'v3 reflects what the client believes they are buying',detail:'Lead Partner · Pricing Sheet · v3 reflects what the client believes they are buying',blocker:false},
+        {id:'cl4',text:'Complete final Pricing Sheet v4 — full team names/roles, profitability, profit share, staffing ratios',owner:'Lead Partner',sub:'Authoritative baseline for contracting and execution',detail:'Lead Partner · Pricing Sheet · Authoritative baseline for contracting and execution',blocker:true},
+        {id:'cl4b',text:'Name file: [Client]: [Project ID] [Project name] Pricing Sheet v.Final [Date]',owner:'Lead Partner',sub:'e.g. "NHBC: 10139-03 Chief Transformation Officer Pricing Sheet v.Final 5 May 2026"',detail:'Lead Partner · Pricing Sheet · e.g. "NHBC: 10139-03 Chief Transformation Officer Pricing Sheet v.Final 5 May 2026"',blocker:false},
+        {id:'cl4c',text:'Submit pricing sheet v4 to Consulting MD (CC Iryna) for approval',owner:'Lead Partner',sub:'MD must approve all staff assignments; no contractor onboarded without being named in v4',detail:'Lead Partner · Email · MD must approve all staff assignments; no contractor onboarded without being named in v4',blocker:true},
+        {id:'cl5',text:'Obtain Consulting MD final sign-off (v4) before award confirmation',owner:'Consulting MD',sub:'v4 MD sign-off required before client SOW is sent',detail:'Consulting MD · Email · v4 MD sign-off required before client SOW is sent',blocker:true},
+        {id:'cl5b',text:'Store final Pricing Sheet v4 in Confidential folder (Torr / SharePoint until Torr feature available)',owner:'Consulting MD / Iryna',sub:'MD access only',detail:'Consulting MD / Iryna · Torr (Confidential) · MD access only',blocker:false},
+      ]},
+    ]
+  },
+  contracting:{
+    full:'Contracting',
+    entry:'Client award confirmed + MD sign-off on commercials',
+    exit:'Internal Consulting MD sign-off — max 2 weeks',
+    finance:'Work and billing may begin at risk. Expenses held — cannot be formally assigned to project code until Executing.',
+    roles:[{label:'Lead Partner',color:'#FAEEDA',tc:'#633806',desc:'SoW, CRM update, team onboarding lead'},{label:'Iryna',color:'#FAC775',tc:'#412402',desc:'NDAs, MSA drafting, KYC/AML, procurement'},{label:'Consulting MD',color:'#EF9F27',tc:'#412402',desc:'SoW + MSA countersigning — required'},{label:'James / Miguel',color:'#FAEEDA',tc:'#633806',desc:'M365 accounts, Torr access, WeWork'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update CRM: start date, contract amount, deal stage \'Contracting\'',owner:'LP / Co-owner',sub:'Responsible: LP / Co-owner',detail:'LP / Co-owner · Zoho CRM',blocker:true},
+      ]},
+      {name:'Client',qs:[
+        {id:'cl1',text:'Draft and agree client SOW or equivalent contracting documentation',owner:'Lead Partner',sub:'MD signs all SoWs until signing rights formally confirmed',detail:'Lead Partner · Zoho Sign · MD signs all SoWs until signing rights formally confirmed',blocker:true},
+        {id:'cl_proc',text:'Complete procurement / onboarding steps (supplier list, insurances, cyber security, compliance)',owner:'LP (Iryna supports)',sub:'Responsible: LP (Iryna supports)',detail:'LP (Iryna supports) · —',blocker:false},
+        {id:'cl2',text:'Complete risk and regulation steps (KYC, AML, Confidential status)',owner:'Iryna',sub:'Required when client contract demands it (regulated FIs)',detail:'Iryna · — · Required when client contract demands it (regulated FIs)',blocker:true,conditional:true},
+        {id:'cl_tech',text:'Complete client technology requirements (email, SharePoint, access credentials)',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · M365',blocker:false},
+        {id:'cl_sow_sign',text:'Get client signature(s) on client SOW (CC Consulting MD and Iryna)',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Zoho Sign',blocker:true},
+        {id:'cl_sow_fu',text:'If SOW not received within 5 working days: follow up in writing. If still not received within 10 working days: escalate to Consulting MD',owner:'Lead Partner',sub:'Do not move to \'Executing\' with an unsigned SOW unless MD has approved an explicit exception',detail:'Lead Partner · — · Do not move to \'Executing\' with an unsigned SOW unless MD has approved an explicit exception',blocker:true},
+        {id:'cl_sow_recv',text:'Received signed contracts (CC Consulting MD and Iryna)',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Zoho Sign',blocker:true},
+        {id:'cl_conf',text:'Save signed contract in Confidential folder',owner:'Consulting MD / Iryna',sub:'Responsible: Consulting MD / Iryna',detail:'Consulting MD / Iryna · SharePoint',blocker:true},
+      ]},
+      {name:'Team',qs:[
+        {id:'tm2',text:'Prepare Zoho Sign NDA contracts for all project team members (if needed)',owner:'Iryna',sub:'Reference: Trimstone_Standard NDA_Corporate_Template.docx',detail:'Iryna · Zoho Sign · Reference: Trimstone_Standard NDA_Corporate_Template.docx',blocker:false,conditional:true},
+        {id:'tm_msa_draft',text:'Draft MSA contracts for all third-party team members — share with staff & MD; do not sign yet',owner:'Iryna',sub:'Trimstone_MSA_Final.docx; do not proceed to signature yet',detail:'Iryna · — · Trimstone_MSA_Final.docx; do not proceed to signature yet',blocker:false},
+        {id:'tm1',text:'Send Zoho Sign MSAs to LP; obtain contractor signatures; send countersigned copy to MD',owner:'Iryna',sub:'Responsible: Iryna',detail:'Iryna · Zoho Sign',blocker:true},
+        {id:'tm1b',text:'Consulting MD countersigns all executed MSAs; save in Confidential folder (Torr / SharePoint)',owner:'MD / Iryna',sub:'If any MSA changes are made, MD must approve and countersign',detail:'MD / Iryna · Zoho Sign / Torr / SharePoint · If any MSA changes are made, MD must approve and countersign',blocker:true},
+        {id:'tm_welcome',text:'Send welcome message to new team members from Trimstone account (CC team)',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · M365 / Email',blocker:false},
+        {id:'tm3',text:'Create new Microsoft Trimstone corporate accounts, grant Torr Portal access, and issue WeWork passes',owner:'James / Miguel',sub:'James creates M365 + Torr access. Miguel issues WeWork passes.',detail:'James / Miguel · M365 / Torr Portal / WeWork',blocker:true},
+        {id:'tm4',text:'Add team members in Torr Team tab — complete role, hours, project fields',owner:'LP (Iryna supports)',sub:'Responsible: LP (Iryna supports)',detail:'LP (Iryna supports) · Torr Portal',blocker:false},
+        {id:'tm5',text:'Train team on Torr (timesheets, TAIA, folders) and WeWork logistics',owner:'LP / Project PMO',sub:'Responsible: LP / Project PMO',detail:'LP / Project PMO · Torr / WeWork',blocker:false},
+      ]},
+      {name:'Torr Portal',qs:[
+        {id:'tm_docs',text:'Move all pre-prepared project documents into correct folder structure in Torr (SharePoint) Workspace',owner:'LP + Team',sub:'Delegate to responsible team members',detail:'LP + Team · Torr / SharePoint · Delegate to responsible team members',blocker:false},
+        {id:'tm6',text:'Populate Confidential folder: SOW, MSAs, Pricing Sheet v4, KYC',owner:'Consulting MD / Iryna',sub:'Restricted to MD access only',detail:'Consulting MD / Iryna · Torr (Confidential) · Restricted to MD access only',blocker:true},
+      ]},
+    ]
+  },
+  executing:{
+    full:'Executing (project live)',
+    entry:'Consulting MD internal sign-off from Contracting',
+    exit:'Delivery complete → Closing Down',
+    finance:'First stage at which expenses can be formally assigned to the project code. Finance cadence monthly. Escalate invoices after 45 days outstanding.',
+    roles:[{label:'Lead Partner',color:'#EAF3DE',tc:'#27500A',desc:'Delivery governance, timesheets, CRM updates'},{label:'Iryna',color:'#C0DD97',tc:'#27500A',desc:'Monthly invoicing cycle, supplier reminders'},{label:'Filip',color:'#EAF3DE',tc:'#3B6D11',desc:'Xero setup, profitability reporting'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update deal stage to Executing (Project Live) in Zoho CRM',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · CRM / Torr',blocker:true},
+        {id:'crm1b',text:'Confirm start/end dates + final budget in CRM (consistent with Xero)',owner:'Lead Partner',sub:'End date tracked throughout delivery',detail:'Lead Partner · CRM / Torr · End date tracked throughout delivery',blocker:true},
+        {id:'torr1b',text:'Confirm full project team assignment in Torr Portal',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr Portal',blocker:false},
+        {id:'torr1c',text:'Finalise workspace structure and ensure team access',owner:'LP / PMO',sub:'Responsible: LP / PMO',detail:'LP / PMO · Torr Portal',blocker:false},
+        {id:'xero_ts',text:'Enable timesheets and expense tracking in Xero',owner:'Filip',sub:'Responsible: Filip',detail:'Filip · Xero',blocker:false},
+        {id:'xero_inv',text:'Set invoicing schedule and billing milestones in Xero',owner:'Filip',sub:'Responsible: Filip',detail:'Filip · Xero',blocker:false},
+        {id:'tm1',text:'Run internal kickoff meeting',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'tm1b',text:'Run client kickoff meeting and present delivery plan',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'crm_forecast',text:'Keep CRM updated with current revenue forecast and project duration',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · CRM / Torr',blocker:false},
+        {id:'crm_profit',text:'Project profitability reporting — monthly',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'crm_analytics',text:'Zoho Analytics reports every Wednesday',owner:'Iryna',sub:'Responsible: Iryna',detail:'Iryna · Zoho Analytics',blocker:false},
+        {id:'crm_review',text:'Cost and expense forecast review — fortnightly',owner:'Consulting MD',sub:'All LPs come prepared with updated project financials',detail:'Consulting MD · CRM + Xero · All LPs come prepared with updated project financials',blocker:false},
+      ]},
+      {name:'Xero',qs:[
+        {id:'xero_req',text:'Ask Filip to set up project in Xero with full details (project number/name, LP, start date, budget, duration, team)',owner:'Iryna',sub:'CC to Lead Partner',detail:'Iryna · Email · CC to Lead Partner',blocker:true},
+        {id:'xero1',text:'Set up Client/Project in Xero — finance code must match Torr Portal code; include forecasts, partners, subcontractors, consultants per pricing sheet',owner:'Filip',sub:'Finance code must match Torr project code',detail:'Filip · Xero · Finance code must match Torr project code',blocker:true},
+        {id:'xero_acc',text:'Give access to Xero (expense submission)',owner:'Filip / Miguel',sub:'Responsible: Filip / Miguel',detail:'Filip / Miguel · Xero',blocker:false},
+        {id:'tm2',text:'Train team on Xero (expenses · Appendix B) and Torr timesheets',owner:'LP / PMO',sub:'Responsible: LP / PMO',detail:'LP / PMO · —',blocker:false},
+        {id:'xero_exp_move',text:'Move legitimate earlier expenses from personal codes to project code (subject to partner agreement)',owner:'LP / Filip',sub:'Responsible: LP / Filip',detail:'LP / Filip · Xero',blocker:false},
+        {id:'torr1',text:'All team members submit timesheets via Torr by 12:00 every Friday',owner:'All team',sub:'Required to enable accurate profitability tracking',detail:'All team · Torr Portal · Required to enable accurate profitability tracking',blocker:true},
+        {id:'torr_remind',text:'Send Friday 9:00 AM timesheet reminder + Monday follow-up to anyone who has not submitted',owner:'Iryna',sub:'Full automation via Cowork (hands-free)',detail:'Iryna · Power Automate / Cowork · Full automation via Cowork (hands-free)',blocker:false},
+        {id:'torr_tracker',text:'Compile \'Trimstone Timesheet Tracker\' from timesheets; share with LP/Project Leader and Partners (Miguel, Will) + Filip every Monday EOD',owner:'Iryna',sub:'Responsible: Iryna',detail:'Iryna · Torr / SharePoint',blocker:false},
+        {id:'torr_approve',text:'LP / Project Leader approves timesheets weekly',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr Portal',blocker:true},
+        {id:'torr_days',text:'LP communicates expected days per team member; team reflects this in weekly timesheets; reconciled vs. invoice; discrepancies escalated to LP',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'torr_pol',text:'Once MSA signed, send Trimstone Expense Policy to all third-party + internal team members',owner:'Iryna',sub:'Ref: Trimstone_Expense_Policy 1.docx',detail:'Iryna · Email · Ref: Trimstone_Expense_Policy 1.docx',blocker:false},
+        {id:'xero_remind_int',text:'Send monthly reminder to internal team to submit project expenses in Xero (CC LP + Filip)',owner:'Iryna',sub:'Responsible: Iryna',detail:'Iryna · Power Automate',blocker:false},
+        {id:'xero_remind_ac',text:'Send fortnightly reminders to ACs (suppliers) re Xero expenses — 1st reminder on the 13th, 2nd at end of month. In the 2nd reminder, also ask them to send invoices to Trimstone via email (CC LP, MD, Iryna, Filip)',owner:'Iryna',sub:'Replaces previous single monthly reminder — gives suppliers two clear submission prompts',detail:'Iryna · Power Automate · Replaces previous single monthly reminder — gives suppliers two clear submission prompts',blocker:false},
+        {id:'xero_verify',text:'Each month verify Filip received supplier invoices; request client invoice preparation',owner:'Iryna',sub:'Responsible: Iryna',detail:'Iryna · —',blocker:false},
+        {id:'xero_run',text:'Review/approve expenses across both runs — Run 1 (1st–2nd, pay 3rd) & Run 2 (15th–16th, pay 17th)',owner:'LP (approves) / Filip (processes)',sub:'Ref: Payment Rules & Finance Cadence Policy',detail:'LP (approves) / Filip (processes) · Xero · Ref: Payment Rules & Finance Cadence Policy',blocker:false},
+        {id:'xero_inv_prep',text:'Prepare client invoice; send to LP and MD for approval',owner:'Filip / Finance',sub:'Responsible: Filip / Finance',detail:'Filip / Finance · Xero / Email',blocker:false},
+        {id:'xero_send',text:'Send monthly invoices to client by 6th of each month',owner:'Filip / Finance',sub:'Responsible: Filip / Finance',detail:'Filip / Finance · Xero',blocker:false},
+        {id:'xero_profit',text:'Track project profitability and margin reporting monthly',owner:'Filip / Finance',sub:'Responsible: Filip / Finance',detail:'Filip / Finance · Xero',blocker:false},
+        {id:'xero_cc',text:'Support credit control / client payment follow-up where invoices are overdue',owner:'Finance + LP',sub:'Escalate after 45 days outstanding',detail:'Finance + LP · Xero · Escalate after 45 days outstanding',blocker:false},
+      ]},
+      {name:'Team',qs:[
+        {id:'tm_gov',text:'Run delivery governance meetings and steering committees',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · —',blocker:false},
+        {id:'tm_scope',text:'Record any scope changes; seek MD approval for all material changes',owner:'Lead Partner',sub:'Material scope changes require MD sign-off before proceeding',detail:'Lead Partner · — · Material scope changes require MD sign-off before proceeding',blocker:false},
+        {id:'tm_pause',text:'If delivery pauses: LP records reason/date in Torr scope log; notifies MD within 24h; communicates to client within 48h; invoicing pauses',owner:'LP / Consulting MD',sub:'Invoicing resumes only when restart conditions are agreed and documented',detail:'LP / Consulting MD · Torr / CRM · Invoicing resumes only when restart conditions are agreed and documented',blocker:false},
+      ]},
+      {name:'Client',qs:[
+        {id:'cl_feedback',text:'Gather and document client feedback monthly; escalate material concerns to MD',owner:'Lead Partner',sub:'Feedback logged in project workspace',detail:'Lead Partner · Email / Forms / Torr · Feedback logged in project workspace',blocker:false},
+      ]},
+    ]
+  },
+  closing:{
+    full:'Closing down (won)',
+    entry:'Delivery complete; engagement ending successfully',
+    exit:'Invoice issued · payment received · access removed · knowledge captured',
+    finance:'Ensure all reimbursable expenses are captured. Ensure final invoice reflects any agreed final items.',
+    roles:[{label:'Lead Partner',color:'#d1fae5',tc:'#04342C',desc:'Client confirmation, CRM close-out, follow-on logging'},{label:'Finance / Filip',color:'#9FE1CB',tc:'#085041',desc:'Final invoice, expense reconciliation'},{label:'James / Ops',color:'#d1fae5',tc:'#04342C',desc:'Access removal for all rolling-off consultants'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update Deal Stage to \'Closing Down (Won)\' in CRM',owner:'Lead Partner',sub:'Set status immediately on confirmation of delivery completion',detail:'Lead Partner · CRM / Torr · Set status immediately on confirmation of delivery completion',blocker:true,autoYes:true},
+        {id:'crm_end',text:'Confirm project end date in CRM',owner:'Project Owner',sub:'Responsible: Project Owner',detail:'Project Owner · CRM / Torr',blocker:false},
+        {id:'cl1',text:'Confirm final delivery completion formally with client — written confirmation preferred',owner:'Project Owner',sub:'Retain written confirmation in project workspace',detail:'Project Owner · — · Retain written confirmation in project workspace',blocker:true},
+      ]},
+      {name:'Xero',qs:[
+        {id:'xero1',text:'Collect and submit all outstanding expenses before final invoice is raised',owner:'Project Team',sub:'All expenses must be submitted before final invoice',detail:'Project Team · Xero · All expenses must be submitted before final invoice',blocker:true},
+        {id:'xero2',text:'Issue final invoice — include all agreed final items and reimbursables',owner:'Filip / Finance',sub:'Responsible: Filip / Finance',detail:'Filip / Finance · Xero',blocker:true},
+        {id:'xero_profit',text:'Complete partner profit payout calculations per pricing sheet',owner:'Filip / Finance',sub:'Responsible: Filip / Finance',detail:'Filip / Finance · Xero',blocker:false},
+        {id:'xero3',text:'Confirm financial closure of project in Xero — no further costs/revenues expected',owner:'Filip / Finance',sub:'Close monthly processes',detail:'Filip / Finance · Xero · Close monthly processes',blocker:true},
+      ]},
+      {name:'Torr Portal',qs:[
+        {id:'torr1',text:'Archive all project materials in project workspace in Torr',owner:'Project Owner',sub:'Archive final deliverables and key working materials',detail:'Project Owner · Torr / SharePoint · Archive final deliverables and key working materials',blocker:true},
+        {id:'torr_lessons',text:'Capture lessons learned, knowledge, and delivery insights',owner:'LP + Team',sub:'Store lessons-learned summary and follow-on notes',detail:'LP + Team · Torr Portal · Store lessons-learned summary and follow-on notes',blocker:false},
+        {id:'crm_followon',text:'Record any follow-on opportunities in CRM',owner:'Lead Partner',sub:'Log potential extensions, new workstreams, or referrals',detail:'Lead Partner · Torr / CRM · Log potential extensions, new workstreams, or referrals',blocker:false},
+      ]},
+      {name:'Team',qs:[
+        {id:'tm1',text:'Remove Trimstone system access for all consultants rolling off the project',owner:'James / Ops',sub:'Exceptions: (1) rolling onto another Trimstone project; (2) by request where consultant likely to work with Trimstone again. Exceptions must be recorded.',detail:'James / Ops · M365 / Torr / Xero · Exceptions: (1) rolling onto another Trimstone project; (2) by request where consultant likely to work with Trimstone again. Exceptions must be recorded.',blocker:true},
+        {id:'cl2',text:'Confirm client system access has been removed (client\'s responsibility)',owner:'Lead Partner',sub:'LP to confirm this has occurred',detail:'Lead Partner · — · LP to confirm this has occurred',blocker:false},
+      ]},
+    ]
+  },
+  hold:{
+    full:'On hold',
+    entry:'4-weekly review decision that opportunity is not progressing',
+    exit:'Re-activate to active stage, or close to Closed Lost',
+    finance:'No additional financial rules beyond the stage the deal is coming from. Avoid incurring new costs unless explicitly justified and recorded.',
+    roles:[{label:'Lead Partner',color:'#FAEEDA',tc:'#412402',desc:'CRM update, review scheduling, activity pause'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update Deal Stage to \'On Hold\' in CRM',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr / CRM',blocker:true,autoYes:true},
+        {id:'cl1',text:'Record reason for hold and the restart trigger in CRM — be specific',owner:'Lead Partner',sub:'What would cause this deal to re-activate?',detail:'Lead Partner · Torr / CRM · What would cause this deal to re-activate?',blocker:true},
+        {id:'crm2',text:'Set Next Review Date aligned to next 4-weekly portfolio review',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr / CRM',blocker:true},
+        {id:'hold_pause',text:'Pause all proposal activity unless the deal is formally re-activated',owner:'Lead Partner',sub:'No new pursuit activity while on hold',detail:'Lead Partner · — · No new pursuit activity while on hold',blocker:false},
+        {id:'hold_cost',text:'Do not incur new pursuit costs unless explicitly approved and recorded',owner:'Lead Partner',sub:'Any exceptions must be justified and noted in CRM',detail:'Lead Partner · — · Any exceptions must be justified and noted in CRM',blocker:false},
+        {id:'hold_review',text:'Re-assess at each 4-weekly portfolio review: re-activate, re-date, or close',owner:'MD + LP',sub:'Explicit decision recorded at each review — no passive roll-forward',detail:'MD + LP · Torr / CRM · Explicit decision recorded at each review — no passive roll-forward',blocker:false},
+        {id:'hold_reactivate',text:'Move back to appropriate active stage if client momentum resumes',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr / CRM',blocker:false},
+      ]},
+    ]
+  },
+  lost:{
+    full:'Closed lost',
+    entry:'Client decision not to award, or LP kills the opportunity',
+    exit:'CRM reason recorded · costs settled · archives complete · lessons captured',
+    finance:'Proposal and prospecting costs are allocated to the core partners (Deal Owners). No further reimbursement occurs.',
+    roles:[{label:'Lead Partner',color:'#F1EFE8',tc:'#2C2C2A',desc:'CRM close-out, archive, lessons learned'},{label:'Finance / Filip',color:'#D3D1C7',tc:'#2C2C2A',desc:'Third-party cost settlement and reallocation'}],
+    groups:[
+      {name:'Zoho CRM',qs:[
+        {id:'crm1',text:'Update Deal Stage to \'Closed Lost\' in CRM',owner:'Lead Partner',sub:'Responsible: Lead Partner',detail:'Lead Partner · Torr / CRM',blocker:true},
+        {id:'crm_reason',text:'Record Closed Lost reason and short narrative explanation in CRM',owner:'Lead Partner',sub:'Captures institutional learning',detail:'Lead Partner · Torr / CRM · Captures institutional learning',blocker:true},
+        {id:'fin_confirm',text:'Confirm core partner group responsible for proposal costs',owner:'Finance / Filip',sub:'Identify Deal Owner and core group for cost allocation',detail:'Finance / Filip · Xero · Identify Deal Owner and core group for cost allocation',blocker:false},
+        {id:'fin1',text:'Reallocate proposal costs across core partner accounts if required',owner:'Finance / Filip',sub:'Net off personal spend; reallocate proportionally',detail:'Finance / Filip · Xero · Net off personal spend; reallocate proportionally',blocker:false},
+        {id:'fin_tp',text:'Ensure any third-party costs are settled per agreed approach',owner:'Finance / Filip',sub:'Responsible: Finance / Filip',detail:'Finance / Filip · Xero',blocker:false},
+        {id:'torr1',text:'Archive pricing sheet, proposal materials, and relevant correspondence',owner:'Project Owner',sub:'Store in project workspace for future reference and pitch reuse',detail:'Project Owner · Torr / SharePoint · Store in project workspace for future reference and pitch reuse',blocker:false},
+        {id:'torr2',text:'Capture lessons learned from the opportunity',owner:'Lead Partner',sub:'What worked, what did not, what would change',detail:'Lead Partner · Torr Portal · What worked, what did not, what would change',blocker:false},
+        {id:'lost_share',text:'Share insights with partner group if strategically significant',owner:'Lead Partner',sub:'Discretionary — apply judgement',detail:'Lead Partner · — · Discretionary — apply judgement',blocker:false},
+      ]},
+    ]
+  },
+}
+
+// ══════════════════════════════════════════════
+// STATE — direct REST fetch (no supabase-js needed)
+// ══════════════════════════════════════════════
+const HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+}
+
+async function sbSelect(table, columns='*', filters={}) {
+  let url = SUPABASE_REST + '/' + table + '?select=' + columns
+  Object.entries(filters).forEach(([k,v]) => url += `&${k}=eq.${encodeURIComponent(v)}`)
+  const r = await fetch(url, { headers: HEADERS, mode: 'cors' })
+  if (!r.ok) {
+    const txt = await r.text()
+    throw new Error(`${table} ${r.status}: ${txt}`)
+  }
+  return r.json()
+}
+
+async function sbUpsert(table, row, onConflict) {
+  const url = SUPABASE_REST + '/' + table + '?on_conflict=' + onConflict
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { ...HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(row)
+  })
+  if (!r.ok) { const t = await r.text(); throw new Error(t) }
+  return { error: null }
+}
+
+async function sbInsert(table, row) {
+  const url = SUPABASE_REST + '/' + table
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(row)
+  })
+  if (!r.ok) { const t = await r.text(); throw new Error(t) }
+  return { data: await r.json(), error: null }
+}
+const P = new URLSearchParams(location.search)
+// ── ROLE SYSTEM ──────────────────────────────────────────────────────────────
+// admin URL: dashboard.html?role=admin  → MD/Miguel — save to localStorage
+// owner URL: dashboard.html?user=William.Conner → owner sees own projects
+// direct:    dashboard.html → reads localStorage for saved role
+// ─────────────────────────────────────────────────────────────────────────────
+const ADMIN_USERS = ['Miguel Ortiz', 'William Conner'] // MD + Miguel see all
+
+function initUserRole() {
+  const urlRole = P.get('role')
+  const urlUser = P.get('user')
+
+  if (urlRole === 'admin') {
+    localStorage.setItem('ts_role', 'admin')
+    localStorage.setItem('ts_user', urlUser || 'admin')
+  } else if (urlUser) {
+    localStorage.setItem('ts_role', 'owner')
+    localStorage.setItem('ts_user', urlUser)
+  }
+}
+initUserRole()
+
+const savedRole = localStorage.getItem('ts_role') || 'owner'
+const savedUser = localStorage.getItem('ts_user') || P.get('user') || ''
+const isAdmin   = savedRole === 'admin' || ADMIN_USERS.some(u => savedUser.toLowerCase().includes(u.split(' ')[0].toLowerCase()) && u !== savedUser) === false && ADMIN_USERS.some(u => u.toLowerCase() === savedUser.toLowerCase())
+
+const currentUser = savedUser || 'dashboard-user'
+const currentRole = P.get('role') || savedRole || 'lead-partner'
+const ownerFirstName = currentUser !== 'dashboard-user'
+  ? currentUser.split(/[.\s]/)[0].toLowerCase() : null
+
+let projects = []
+let allTicksCache = {} // pid__stage__action → {done, na}
+let mainView = 'grid'
+let ownerSelId = null
+let ownerStage = null
+let ownerOpenQ = null
+let ownerCollapsed = new Set()
+let pFilter = 'all'
+let pStageFilter = 'all'
+let pOpenId = null
+const TODAY = new Date()
+
+function daysAgo(d) { return d ? Math.round((TODAY - new Date(d)) / 86400000) : 0 }
+function stO(s) { return s==='red'?0:s==='amber'?1:2 }
+
+// ══════════════════════════════════════════════
+// SUPABASE — LOAD
+// ══════════════════════════════════════════════
+async function loadDashboard() {
+  document.getElementById('loading').style.display = 'flex'
+  document.getElementById('owner-view').style.display = 'none'
+  document.getElementById('partners-view').style.display = 'none'
+
+  // Demo mode — works without Supabase credentials
+  if (DEMO_MODE) {
+    return loadDemoData()
+  }
+
+  try {
+    const [rows, prog, tix] = await Promise.all([
+      sbSelect('projects', 'id,deal_name,account_name,deal_owner,current_stage,updated_at'),
+      sbSelect('project_stage_progress', 'project_id,stage_key,done_count,total_count,pct_complete'),
+      sbSelect('ticks', 'project_id,stage_key,action_id,is_done,is_na,last_toggled_by,last_toggled_at'),
+    ])
+
+    // Build tick map: "pid__stage__action" → {done, na}
+    const tickMap = {}
+    tix.forEach(t => {
+      const k = `${t.project_id}__${t.stage_key}__${t.action_id}`
+      const v = { done: t.is_done, na: t.is_na || false, by: t.last_toggled_by, at: t.last_toggled_at }
+      tickMap[k] = v
+      allTicksCache[k] = v
+    })
+
+    // Build progress map
+    const progMap = {}
+    prog.forEach(p => { progMap[`${p.project_id}__${p.stage_key}`] = p })
+
+    // Build projects array
+    projects = (rows || []).map(r => {
+      const answers = buildAnswers(r.id, r.current_stage, tickMap)
+      return {
+        id:         r.id,
+        name:       r.deal_name || 'Unnamed project',
+        client:     r.account_name || '—',
+        lp:         r.deal_owner || '—',
+        stage:      normaliseStage(r.current_stage || 'discussions'),
+        movedAt:    r.updated_at,
+        answers,
+        condAnswers:{},
+        progress:   progMap[`${r.id}__${normaliseStage(r.current_stage||'')}`] || {done_count:0,total_count:0,pct_complete:0},
+        status:     calcStatus(r.id, normaliseStage(r.current_stage||''), tickMap),
+        alerts:     buildAlerts(r, tickMap),
+      }
+    })
+
+    // Apply URL params
+    if (P.get('project')) {
+      const found = projects.find(p => p.id === P.get('project'))
+      if (found) ownerSelId = found.id
+    }
+    if (!ownerSelId) {
+    // Default to first project owned by current user, or first project
+    const myFirst = ownerFirstName
+      ? projects.find(p => p.lp && p.lp.toLowerCase().includes(ownerFirstName))
+      : null
+    ownerSelId = myFirst?.id || projects[0]?.id
+    if (ownerSelId) gridSelProj = ownerSelId
+  }
+    if (P.get('stage'))  ownerStage = P.get('stage')
+    if (P.get('view'))   setMainView(P.get('view'))
+    if (P.get('filter')) pFilter = P.get('filter')
+
+    subscribeToTicks()
+    renderSidebar()
+
+    document.getElementById('loading').style.display = 'none'
+    // Show correct view — ensure DOM is visible before rendering grid
+    document.getElementById('owner-view').style.display = mainView === 'owner' ? 'block' : 'none'
+    document.getElementById('grid-view').style.display  = mainView === 'grid'  ? 'block' : 'none'
+    if (mainView === 'owner') renderOwner()
+    else {
+      if (!gridSelProj && projects.length) gridSelProj = projects[0].id
+      requestAnimationFrame(() => renderGrid())
+    }
+
+  } catch(err) {
+    document.getElementById('loading').innerHTML =
+      `<div style="color:#A32D2D;text-align:center;padding:2rem"><strong>Connection error</strong><br><span style="font-size:11px;color:#6b6860;display:block;margin-top:8px">${err.message}</span><br><button onclick="loadDashboard()" style="font-size:11px;padding:6px 14px;border:1px solid #ccc;border-radius:6px;cursor:pointer;margin-top:8px">Retry</button></div>`
+  }
+}
+
+function buildAnswers(pid, stageKey, tickMap) {
+  const answers = {}
+  const sd = OWNER_STAGES[stageKey]
+  if (!sd) return answers
+  sd.groups.flatMap(g => g.qs).forEach(q => {
+    if (q.autoYes) {
+      answers[q.id] = 'yes'  // Auto-confirmed by Zoho workflow
+      return
+    }
+    const t = tickMap[`${pid}__${stageKey}__${q.id}`]
+    if (t) answers[q.id] = t.na ? 'na' : t.done ? 'yes' : 'no'
+  })
+  return answers
+}
+
+function calcStatus(pid, stageKey, tickMap) {
+  const sd = OWNER_STAGES[stageKey]
+  if (!sd) return 'green'
+  const qs = sd.groups.flatMap(g => g.qs)
+  const undone = qs.filter(q => q.blocker && !q.conditional &&
+    tickMap[`${pid}__${stageKey}__${q.id}`]?.done !== true).length
+  return undone > 2 ? 'red' : undone > 0 ? 'amber' : 'green'
+}
+
+function buildAlerts(r, tickMap) {
+  const alerts = []
+  const normStage = normaliseStage(r.current_stage || '')
+  const sd = OWNER_STAGES[normStage]
+  if (!sd) return alerts
+  const blockers = sd.groups.flatMap(g=>g.qs).filter(q =>
+    q.blocker && !q.conditional &&
+    tickMap[`${r.id}__${normStage}__${q.id}`]?.done !== true
+  )
+  if (blockers.length > 0) {
+    alerts.push({
+      icon:'⚠️',
+      title:`${blockers.length} critical action${blockers.length>1?'s':''} outstanding`,
+      sub: blockers.slice(0,2).map(q=>q.text).join(' · '),
+      mdAction: blockers.some(q=>q.id.includes('md') || q.text.toLowerCase().includes('md')),
+      urgency: blockers.length > 2 ? 'red' : 'amber'
+    })
+  }
+  const days = daysAgo(r.updated_at)
+  if (days > 10 && alerts.length === 0) {
+    alerts.push({icon:'⏰',title:`${days} days in this stage — no recent updates`,sub:'Check CRM is up to date and next step is set.',mdAction:false,urgency:'amber'})
+  }
+  if (alerts.length === 0) {
+    alerts.push({icon:'✅',title:'Progressing well',sub:'No critical actions outstanding.',mdAction:false,urgency:'green'})
+  }
+  return alerts
+}
+
+// ══════════════════════════════════════════════
+// SUPABASE — WRITE
+// ══════════════════════════════════════════════
+async function writeAnswer(p, qid, val) {
+  showSaving()
+  const isDone = val === 'yes'
+  const isNa   = val === 'na'
+
+  const { error } = await sbUpsert('ticks', {
+    project_id:        p.id,
+    stage_key:         p.stage,
+    action_id:         qid,
+    is_done:           isDone,
+    is_na:             isNa,
+    last_toggled_by:   currentUser,
+    last_toggled_role: currentRole,
+    last_toggled_at:   new Date().toISOString(),
+  }, 'project_id,action_id')
+
+  if (error) { console.error('Write failed:', error); hideSaving(false) }
+  else hideSaving(true)
+}
+
+// ══════════════════════════════════════════════
+// SUPABASE — REAL-TIME
+// ══════════════════════════════════════════════
+function subscribeToTicks() {
+  // Poll every 60 seconds — silently update data without re-rendering
+  // Only re-render if user hasn't interacted in the last 5 seconds
+  setInterval(async () => {
+    try {
+      const tix = await sbSelect('ticks', 'project_id,stage_key,action_id,is_done,is_na')
+      tix.forEach(t => {
+        const p = projects.find(x => x.id === t.project_id)
+        if (!p) return
+        if (t.stage_key === p.stage) {
+          p.answers[t.action_id] = t.is_na ? 'na' : t.is_done ? 'yes' : 'no'
+          p.status = recalcStatus(p)
+        }
+        // Also update allTicksCache
+        allTicksCache[t.project_id + '__' + t.stage_key + '__' + t.action_id] = {done: t.is_done, na: t.is_na}
+      })
+      // Only re-render if user hasn't clicked in last 5 seconds
+      const idleSince = Date.now() - lastInteraction
+      if (idleSince > 5000) {
+        if (mainView === 'owner') renderOwner()
+        else renderGrid()
+      }
+    } catch(e) { /* silent fail */ }
+  }, 60000)
+}
+
+// Global helpers (defined once, not per-render)
+const isInternal = p => p.client && p.client.toLowerCase().includes('trimstone')
+
+// Track last user interaction to avoid render conflicts
+let lastInteraction = Date.now()
+document.addEventListener('click', () => { lastInteraction = Date.now() })
+document.addEventListener('keydown', () => { lastInteraction = Date.now() })
+
+function recalcStatus(p) {
+  const sd = OWNER_STAGES[p.stage]
+  if (!sd) return 'green'
+  const undone = sd.groups.flatMap(g=>g.qs).filter(q =>
+    q.blocker && !q.conditional && p.answers[q.id] !== 'yes'
+  ).length
+  return undone > 2 ? 'red' : undone > 0 ? 'amber' : 'green'
+}
+
+// ══════════════════════════════════════════════
+// SAVE INDICATOR
+// ══════════════════════════════════════════════
+let saveTimer
+function showSaving() {
+  const el = document.getElementById('save-ind')
+  el.innerHTML = '<span style="width:10px;height:10px;border:1.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block"></span> Saving…'
+  el.classList.add('show')
+}
+function hideSaving(ok) {
+  const el = document.getElementById('save-ind')
+  el.innerHTML = ok ? '✓ Saved' : '✗ Error saving'
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => el.classList.remove('show'), 1800)
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function isEffectiveBlocker(p, q) {
+  if (!q.conditional) return q.blocker
+  const req = p.condAnswers[`${p.stage}_${q.id}_req`]
+  if (req === 'na') return false
+  if (req === 'yes') return q.blocker
+  return false
+}
+
+function critLabel(p, q) {
+  if (q.autoYes) {
+    return `<span class="qcrit" style="background:#EAF3DE;color:#3B6D11">Auto ✓</span>`
+  }
+  if (!q.conditional) {
+    return q.blocker
+      ? `<span class="qcrit" style="background:#FCEBEB;color:#A32D2D">Critical</span>`
+      : `<span class="qcrit" style="background:var(--gray-50);color:var(--gray-400)">Recommended</span>`
+  }
+  const req = p.condAnswers[`${p.stage}_${q.id}_req`]
+  if (req === 'yes') return q.blocker
+    ? `<span class="qcrit" style="background:#FCEBEB;color:#A32D2D">Critical</span>`
+    : `<span class="qcrit" style="background:var(--gray-50);color:var(--gray-400)">Recommended</span>`
+  if (req === 'na') return `<span class="qcrit" style="background:var(--gray-50);color:var(--gray-400)">N/A</span>`
+  return `<span class="qcrit" style="background:#FAEEDA;color:#854F0B">If needed</span>`
+}
+
+function condQ(qid) {
+  if (qid === 'tm3') return 'Are there new subcontractors on this project that need onboarding?'
+  if (qid === 'tm2') return 'Do any project team members require NDAs?'
+  if (qid === 'cl2') return 'Does this client require KYC/AML or confidential compliance steps?'
+  return 'Is this required for this project?'
+}
+
+// ══════════════════════════════════════════════
+// VIEW TOGGLE
+// ══════════════════════════════════════════════
+function setMainView(v) {
+  mainView = v
+  // Sync selected project between views
+  if (v === 'owner' && gridSelProj && !ownerSelId) ownerSelId = gridSelProj
+  if (v === 'grid'  && ownerSelId  && !gridSelProj) gridSelProj = ownerSelId
+  if (v === 'owner' && gridSelProj) ownerSelId = gridSelProj
+  if (v === 'grid'  && ownerSelId)  gridSelProj = ownerSelId
+
+  document.getElementById('owner-view').style.display = v==='owner' ? 'block' : 'none'
+  document.getElementById('partners-view').style.display = 'none'
+  document.getElementById('grid-view').style.display = v==='grid' ? 'block' : 'none'
+  document.getElementById('topbar-title').textContent = v==='owner' ? 'My project' : 'Pipeline grid'
+  document.getElementById('sb-owner').className = 'sidebar-btn' + (v==='owner' ? ' active' : '')
+  document.getElementById('sb-grid').className = 'sidebar-btn' + (v==='grid' ? ' active' : '')
+  ;['owner','grid'].forEach(x => {
+    const b = document.getElementById('vbtn-'+x)
+    if (b) b.className = 'vt-btn' + (v===x ? ' active' : '')
+  })
+  if (v==='owner') renderOwner()
+  else renderGrid()
+}
+
+// ══════════════════════════════════════════════
+// SIDEBAR
+// ══════════════════════════════════════════════
+// Track which stage groups are expanded in sidebar
+const sidebarExpanded = new Set() // all collapsed by default — click to expand
+
+function renderSidebar() {
+  const STAGE_ORDER = ['discussions','scoping','pricing','contracting','executing','closing','hold']
+  const STAGE_LABELS = {
+    discussions:'In Discussions',
+    scoping:'Prospecting & Scoping',
+    pricing:'Pricing & Proposing',
+    contracting:'Contracting',
+    executing:'Executing (Project Live)',
+    closing:'Closing Down (Won)',
+    hold:'On Hold'
+  }
+
+  // Split into Trimstone internal vs client projects
+
+  // Filter by owner if not admin
+  // ownerFirstName computed from global currentUser
+  const visibleProjects = (isAdmin || !ownerFirstName)
+    ? projects
+    : projects.filter(p =>
+        !p.lp || p.lp.toLowerCase().includes(ownerFirstName) ||
+        p.id === gridSelProj || p.id === ownerSelId
+      )
+
+  const clientProjects   = visibleProjects.filter(p => !isInternal(p) && p.stage !== 'lost')
+  const internalProjects = projects.filter(p => isInternal(p) && p.stage !== 'lost')
+
+  // Group client projects by stage
+  const grouped = {}
+  STAGE_ORDER.forEach(s => grouped[s] = [])
+  clientProjects.forEach(p => {
+    const s = p.stage || 'discussions'
+    if (grouped[s]) grouped[s].push(p)
+    else grouped['discussions'].push(p)
+  })
+
+  // Auto-expand stage of currently selected project
+  const selProj = projects.find(p => p.id === (gridSelProj || ownerSelId))
+  // Auto-expand handled by selProjBoth — not here
+
+  let html = ''
+
+  // ── Client deals grouped by stage ──
+  STAGE_ORDER.forEach(stageId => {
+    const list = grouped[stageId]
+    if (!list.length) return
+    const st   = stFor(stageId)
+    const open = sidebarExpanded.has(stageId)
+    // Count how many in this stage have blockers outstanding
+    const blockedBadge = ''
+    html += `<div class="sidebar-stage-group">
+      <div class="sidebar-stage-label" onclick="toggleSidebarStage('${stageId}',event)" style="cursor:pointer">
+        <div style="width:7px;height:7px;border-radius:50%;background:${st.color};flex-shrink:0"></div>
+        <span style="flex:1">${STAGE_LABELS[stageId]}</span>
+        ${blockedBadge}
+        <span class="sidebar-stage-count">${list.length}</span>
+        <span style="font-size:9px;opacity:.4;display:inline-block;transform:rotate(${open?'0':'180'}deg)">▲</span>
+      </div>`
+    if (open) {
+      html += list.map(p => {
+        const isActive = p.id === gridSelProj || p.id === ownerSelId
+        return `<div class="proj-item ${isActive?'active':''}" data-pid="${p.id}" onclick="selProjBoth('${p.id}')" title="${p.name}">
+          <div style="display:flex;align-items:center;gap:4px;min-width:0">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px;line-height:1.4">${p.name}</span>
+            ${p.lp ? '<span style="font-size:10px;color:rgba(255,255,255,.35);flex-shrink:0;white-space:nowrap">' + p.lp + '</span>' : ''}
+          </div>
+        </div>`
+      }).join('')
+    }
+    html += `</div>`
+  })
+
+  // ── Closed Lost ──
+  const lostProjects = projects.filter(p => p.stage === 'lost')
+  if (lostProjects.length) {
+    const open = sidebarExpanded.has('lost')
+    html += `<div class="sidebar-stage-group">
+      <div class="sidebar-stage-label" onclick="toggleSidebarStage('lost',event)" style="cursor:pointer;opacity:.6">
+        <div style="width:7px;height:7px;border-radius:50%;background:#888780;flex-shrink:0"></div>
+        <span style="flex:1">Closed Lost</span>
+        <span class="sidebar-stage-count">${lostProjects.length}</span>
+        <span style="font-size:9px;opacity:.4;display:inline-block;transform:rotate(${open?'0':'180'}deg)">▲</span>
+      </div>`
+    if (open) {
+      html += lostProjects.map(p => {
+        const isActive = p.id === gridSelProj || p.id === ownerSelId
+        return `<div class="proj-item ${isActive?'active':''}" data-pid="${p.id}" onclick="selProjBoth('${p.id}')" title="${p.name}" style="opacity:.5">
+          <div style="display:flex;align-items:center;gap:4px;min-width:0">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px;line-height:1.4;text-decoration:line-through">${p.name}</span>
+            ${p.lp ? '<span style="font-size:10px;color:rgba(255,255,255,.25);flex-shrink:0;white-space:nowrap">' + p.lp + '</span>' : ''}
+          </div>
+        </div>`
+      }).join('')
+    }
+    html += `</div>`
+  }
+
+  // ── Trimstone internal ──
+  if (internalProjects.length) {
+    const open = sidebarExpanded.has('internal')
+    html += `<div class="sidebar-stage-group" style="margin-top:8px;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">
+      <div class="sidebar-stage-label" onclick="toggleSidebarStage('internal',event)" style="cursor:pointer">
+        <div style="width:7px;height:7px;border-radius:50%;background:#888780;flex-shrink:0"></div>
+        <span>Trimstone internal</span>
+        <span class="sidebar-stage-count">${internalProjects.length}</span>
+        <span style="margin-left:4px;font-size:9px;opacity:.5;display:inline-block;transform:rotate(${open?'0':'180'}deg)">▲</span>
+      </div>`
+    if (open) {
+      html += internalProjects.map(p => {
+        const isActive = p.id === gridSelProj || p.id === ownerSelId
+        return `<div class="proj-item ${isActive?'active':''}" data-pid="${p.id}" onclick="selProjBoth('${p.id}')" title="${p.name}">
+          <div style="display:flex;align-items:center;gap:4px;min-width:0">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px;line-height:1.4">${p.name}</span>
+            ${p.lp ? '<span style="font-size:10px;color:rgba(255,255,255,.35);flex-shrink:0;white-space:nowrap">' + p.lp + '</span>' : ''}
+          </div>
+        </div>`
+      }).join('')
+    }
+    html += `</div>`
+  }
+
+  document.getElementById('sidebar-projects').innerHTML = html
+  // Update user badge
+  const badge = document.getElementById('user-badge')
+  if (badge) {
+    if (isAdmin) {
+      badge.innerHTML = '<span style="background:var(--purple-lt);color:var(--purple-txt);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500">All projects</span>'
+    } else if (currentUser !== 'dashboard-user') {
+      const name = currentUser.replace('.', ' ')
+      badge.innerHTML = '<span style="background:var(--gray-50);color:var(--gray-400);padding:2px 8px;border-radius:10px;font-size:10px">' + name + '</span>'
+    }
+  }
+}
+
+function toggleSidebarStage(stageId, event) {
+  if (event) event.stopPropagation()
+  if (sidebarExpanded.has(stageId)) sidebarExpanded.delete(stageId)
+  else sidebarExpanded.add(stageId)
+  renderSidebar() // only re-render sidebar, don't change main view
+}
+
+let _renderTimer = null
+function selProjBoth(id) {
+  ownerSelId  = id
+  gridSelProj = id
+  gridOpenCell = null
+  ownerStage  = null
+  ownerOpenQ  = null
+  ownerCollapsed.clear()
+
+  // Instant visual feedback — highlight active item in sidebar
+  document.querySelectorAll('.proj-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-pid') === id)
+  })
+
+  // Update topbar badge instantly
+  const p = projects.find(x => x.id === id)
+  if (p) {
+    const stKey = isInternal(p) ? 'internal' : p.stage
+    sidebarExpanded.add(stKey)
+    const badge = document.getElementById('topbar-badge')
+    if (badge) {
+      const st = stFor(p.stage)
+      const zohoUrl = 'https://crm.zoho.eu/crm/org20109486492/tab/Potentials/' + p.id.replace('zcrm_', '').replace('zcrm_', '')
+      badge.innerHTML = '<span style="cursor:pointer" onclick="window.open(\'' + zohoUrl + '\',\'_blank\')" title="Open in Zoho CRM">' + p.name + ' 🔗</span>'
+      badge.style.cssText = 'background:' + st.bg + ';color:' + st.tc
+    }
+  }
+
+  // Debounce full re-render so rapid clicks don't stack
+  clearTimeout(_renderTimer)
+  _renderTimer = setTimeout(() => {
+    renderSidebar()
+    // Use requestAnimationFrame to let browser paint sidebar first
+    requestAnimationFrame(() => {
+      if (mainView === 'grid') renderGrid()
+      else renderOwner()
+    })
+  }, 60)
+}
+
+// ══════════════════════════════════════════════
+// OWNER VIEW
+// ══════════════════════════════════════════════
+function renderOwner() {
+  const p = projects.find(x => x.id === ownerSelId)
+  if (!p) { document.getElementById('owner-view').innerHTML = '<div class="empty">Select a project from the sidebar.</div>'; return }
+
+  const viewSt = p.stage  // always current stage — no switching allowed
+  const vst    = stFor(viewSt)
+  const vsd    = OWNER_STAGES[viewSt]
+  if (!vsd) return
+  const isCur  = true  // always editing current stage
+  const answers  = isCur ? p.answers  : {}
+  const condAns  = isCur ? p.condAnswers : {}
+  const allQs  = vsd.groups.flatMap(g => g.qs)
+  const yCount = allQs.filter(q => answers[q.id] === 'yes').length
+  const pct    = allQs.length ? Math.round((yCount / allQs.length) * 100) : 0
+  const bLeft  = allQs.filter(q => isEffectiveBlocker(p,q) && answers[q.id] !== 'yes' && answers[q.id] !== 'na').length
+  const stageIdx = ['discussions','scoping','pricing','contracting','executing','closing','hold','lost'].indexOf(viewSt) + 1
+
+  // Pills
+  document.getElementById('owner-pills').innerHTML =
+    projects.map(px => `<button class="opill ${ownerSelId===px.id?'active':''}" onclick="selProj('${px.id}')">${px.name}</button>`).join('')
+
+  // Stage tabs
+  document.getElementById('stage-tabs').innerHTML = STAGES.map(st => {
+    const isCurSt = p.stage === st.id
+    const isAct   = viewSt === st.id
+    return `<div class="stab ${isAct?'active':''}" style="border-bottom:2px solid ${isAct?st.color:'transparent'}" onclick="oSetStage('${st.id}')">
+      <div class="stab-dot" style="background:${st.color}"></div>
+      <div class="stab-name" style="${isAct?`color:${st.color}`:''}; font-size:9px">${st.short}</div>
+      ${isCurSt ? `<div class="stab-now" style="color:${st.color}">▶ now</div>` : '<div style="height:11px"></div>'}
+    </div>`
+  }).join('')
+
+  // Build action table rows — exactly like checklist
+  let rowNum = 0
+  const tableRows = vsd.groups.map(g => {
+    const groupRow = `<tr class="group-row"><td colspan="7">${g.name}</td></tr>`
+    const actionRows = g.qs.map(q => {
+      rowNum++
+      const ans    = answers[q.id]
+      const reqKey = `${p.stage}_${q.id}_req`
+      const req    = condAns[reqKey]
+      const isDone = ans === 'yes'
+      const isNA   = ans === 'na' || req === 'na'
+      const isOpen = ownerOpenQ === `${ownerSelId}-${viewSt}-${q.id}`
+
+      // Checkbox class
+      const chkCls = isDone ? 'done' : ''
+
+      // Detail + buttons (shown when row is clicked)
+      let detailHtml = ''
+      if (isOpen) {
+        // SharePoint / Zoho buttons
+        const al   = ACTION_LINKS[q.id]
+        const _al  = al || (q.id === 'cl2' && req === 'yes' && p.stage === 'contracting' ? KYC_LINK : null)
+        const spBtn = _al
+          ? `<button class="act-sp-btn" onclick="event.stopPropagation();window.open('${_al.url}','_blank')">${_al.icon} Open ${_al.label} in SharePoint →</button>`
+          : ''
+        const zohoBtn = q.id.startsWith('crm')
+          ? `<button class="act-sp-btn" style="background:#f8f7f5;border-color:#d8d5ce;color:#4a4842" onclick="event.stopPropagation();window.open('https://crm.zoho.eu/crm/org20109486492/tab/Potentials/${p.id.replace('zcrm_','')}','_blank')">🔗 Open deal in Zoho CRM →</button>`
+          : ''
+
+        let actionBtns = ''
+        if (isCur && !q.autoYes) {
+          if (q.conditional && req === undefined) {
+            actionBtns = `<div class="cond-block">
+              <div class="cond-block-q">${condQ(q.id)}</div>
+              <div class="cond-block-btns">
+                <button class="cb-yes" onclick="event.stopPropagation();setReq('${reqKey}','yes')">✓ Yes — required${q.blocker?' (Critical)':''}</button>
+                <button class="cb-na"  onclick="event.stopPropagation();setReq('${reqKey}','na')">— Not needed</button>
+              </div></div>`
+          } else if (q.conditional && req === 'yes') {
+            actionBtns = `<div class="act-btns">
+              <button class="a-btn a-btn-y" onclick="event.stopPropagation();oSetA('${q.id}','yes')">✓ Yes — done</button>
+              <button class="a-btn a-btn-n" onclick="event.stopPropagation();oSetA('${q.id}','no')">✗ Not yet</button>
+              <button class="a-btn a-btn-na" onclick="event.stopPropagation();setReq('${reqKey}','na')">— N/A</button>
+            </div>`
+          } else if (q.conditional && req === 'na') {
+            actionBtns = `<div style="font-size:11px;color:#9e9b93;margin-top:6px">Marked not required.
+              <button class="a-btn a-btn-na" style="padding:2px 8px;font-size:10px" onclick="event.stopPropagation();setReq('${reqKey}',undefined)">Change</button></div>`
+          } else if (!q.conditional) {
+            const naBtn = !q.blocker ? `<button class="a-btn a-btn-na" onclick="event.stopPropagation();oSetA('${q.id}','na')">— N/A</button>` : ''
+            actionBtns = `<div class="act-btns">
+              <button class="a-btn a-btn-y" onclick="event.stopPropagation();oSetA('${q.id}','yes')">✓ Yes — done</button>
+              <button class="a-btn a-btn-n" onclick="event.stopPropagation();oSetA('${q.id}','no')">✗ Not yet</button>
+              ${naBtn}
+            </div>`
+          }
+        }
+        detailHtml = `<div class="act-detail">${q.detail}</div>${actionBtns}${isDone ? spBtn : ''}${zohoBtn}`
+      }
+
+      // Notes cell: use q.notes if exists, else sub
+      const notesTxt = q.notes || q.sub || '—'
+
+      return `<tr class="${isDone?'done-row':''}" onclick="oToggleQ('${ownerSelId}-${viewSt}-${q.id}')" style="cursor:pointer">
+        <td class="check ${chkCls}" onclick="event.stopPropagation();${
+          isCur && !q.conditional && !q.autoYes
+            ? `oSetA('${q.id}',${isDone?"'no'":"'yes'"})`
+            : `oToggleQ('${ownerSelId}-${viewSt}-${q.id}')`
+        }"><span class="box"></span></td>
+        <td class="num">${rowNum}</td>
+        <td>
+          <div>${q.text}${q.conditional && req===undefined?' <span style="font-size:9px;color:#92400e;font-style:italic">if needed</span>':''}${isNA?' <span style="font-size:9px;color:#9e9b93">(N/A)</span>':''}</div>
+          ${detailHtml}
+        </td>
+        <td class="role">${q.owner||'Lead Partner'}</td>
+        <td class="role">${q.owner||'Lead Partner'}</td>
+        <td class="tool">${q.tool||'—'}</td>
+        <td class="notes-cell">${notesTxt}</td>
+      </tr>`
+    }).join('')
+    return groupRow + actionRows
+  }).join('')
+
+  // Status strip
+  const status = isCur
+    ? (bLeft === 0
+      ? `<div class="status-strip"><div class="ss-dot" style="background:var(--green)"></div><span style="font-size:11px;color:var(--green-txt)">All critical actions cleared — ready to advance</span></div>`
+      : `<div class="status-strip"><div class="ss-dot" style="background:var(--red)"></div><span style="font-size:11px;color:var(--red-txt)">${bLeft} critical action${bLeft>1?'s':''} outstanding before advancing</span></div>`)
+    : ''
+
+  // Checklist open buttons
+  const clHtml = vsd.roles.map(r => `
+    <div class="cl-row">
+      <span class="cl-badge" style="background:${r.color};color:${r.tc}">${r.label}</span>
+      <span class="cl-desc">${r.desc}</span>
+      <button class="cl-open" onclick="openChecklist('${p.id}','${viewSt}','${r.label}')">Open →</button>
+    </div>`).join('')
+
+  document.getElementById('owner-panel').innerHTML = `
+    <div class="act-stage-banner" style="background:linear-gradient(135deg,${vst.color},${vst.color}bb)">
+      <div class="act-banner-eyebrow">Stage ${stageIdx} of 8</div>
+      <div class="act-banner-title">${vsd.full}</div>
+      <div class="act-banner-meta">
+        <div>🔒 <strong>Entry:</strong> ${vsd.entry}</div>
+        <div>↗ <strong>Exit:</strong> ${vsd.exit}</div>
+      </div>
+    </div>
+
+    <div class="act-finance">
+      <span>💷</span>
+      <div><strong>Financial treatment.</strong> ${vsd.finance}</div>
+    </div>
+
+    ${isCur ? `<div class="act-prog"><div class="act-prog-bar"><div class="act-prog-fill" style="width:${pct}%;background:${vst.color}"></div></div><span style="font-size:11px;color:var(--gray-400)">${yCount} of ${allQs.length} done · ${pct}%</span></div>` : ''}
+
+    <div class="act-card">
+      <div class="act-card-title"><div class="act-dot"></div>Required actions</div>
+      <table class="action-table">
+        <thead>
+          <tr><th></th><th>#</th><th>Action</th><th>Responsible</th><th>Accountable</th><th>Tool</th><th>Notes</th></tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+
+    ${status}
+
+    <div class="cl-section">
+      <div class="cl-title">Open shared project checklist</div>
+      ${clHtml}
+      <div style="font-size:10px;color:var(--gray-400);margin-top:5px">Stage: <strong>${vsd.full}</strong> · Project: <strong>${p.name}</strong> · Role pre-filled automatically</div>
+    </div>`
+
+  const _pname = document.getElementById('topbar-project-name')
+  const _aname = document.getElementById('topbar-account-name')
+  if (_pname) _pname.textContent = p.name
+  if (_aname) _aname.textContent = p.client || ''
+  document.getElementById('topbar-badge').textContent = ''
+  document.getElementById('topbar-badge').style.cssText = ''
+}
+
+function openChecklist(pid, stageKey, role) {
+  const base = 'https://trimstone-app.github.io/trimstone-operation-checklist/'
+  const roleMap = {'Lead Partner':'lp','Co-owner / Core Partner':'coown','Consulting MD':'md','Iryna':'iryna','James / Miguel':'james','Finance / Filip':'filip','James / Ops':'james'}
+  const roleKey = roleMap[role] || 'lp'
+  const url = `${base}?project=${encodeURIComponent(pid)}&stage=${stageKey}&role=${roleKey}&user=${encodeURIComponent(currentUser)}`
+  window.open(url, '_blank')
+}
+
+// Owner actions
+function selProj(id) { ownerSelId=id; gridSelProj=id; ownerStage=null; ownerOpenQ=null; ownerCollapsed.clear(); renderSidebar(); renderOwner() }
+function oSetStage(id) { /* stage switching disabled — My project always shows current stage */ }
+function oToggleQ(k) { ownerOpenQ = ownerOpenQ===k ? null : k; renderOwner() }
+function oToggleGrp(id) { ownerCollapsed.has(id) ? ownerCollapsed.delete(id) : ownerCollapsed.add(id); renderOwner() }
+
+async function oSetA(qid, val) {
+  const p = projects.find(x => x.id === ownerSelId)
+  if (!p) return
+  p.answers[qid] = val
+  p.status = recalcStatus(p)
+  // Keep grid in sync
+  const cacheKey = p.id + '__' + p.stage + '__' + qid
+  allTicksCache[cacheKey] = { done: val==='yes', na: val==='na' }
+  ownerOpenQ = null
+  renderOwner()
+  await writeAnswer(p, qid, val)
+}
+
+function setReq(key, val) {
+  const p = projects.find(x => x.id === ownerSelId)
+  if (!p) return
+  if (val === undefined) delete p.condAnswers[key]
+  else p.condAnswers[key] = val
+  ownerOpenQ = null
+  renderOwner()
+}
+
+// ══════════════════════════════════════════════
+// PARTNERS VIEW
+// ══════════════════════════════════════════════
+function renderPartners() {
+  const red    = projects.filter(p => p.status==='red').length
+  const amber  = projects.filter(p => p.status==='amber').length
+  const green  = projects.filter(p => p.status==='green').length
+  const mdN    = projects.filter(p => p.alerts.some(a => a.mdAction)).length
+
+  document.getElementById('summary-grid').innerHTML = `
+    <div class="sum-card" style="background:var(--red-lt)">
+      <div class="sum-label" style="color:var(--red-txt)">Blocked</div>
+      <div class="sum-num" style="color:var(--red-txt)">${red}</div>
+      <div class="sum-sub" style="color:var(--red-txt)">critical action missing</div>
+    </div>
+    <div class="sum-card" style="background:var(--amber-lt)">
+      <div class="sum-label" style="color:var(--amber-txt)">Needs attention</div>
+      <div class="sum-num" style="color:var(--amber-txt)">${amber}</div>
+      <div class="sum-sub" style="color:var(--amber-txt)">owner to act</div>
+    </div>
+    <div class="sum-card" style="background:var(--green-lt)">
+      <div class="sum-label" style="color:var(--green-txt)">On track</div>
+      <div class="sum-num" style="color:var(--green-txt)">${green}</div>
+      <div class="sum-sub" style="color:var(--green-txt)">progressing well</div>
+    </div>
+    <div class="sum-card" style="background:var(--purple-lt)">
+      <div class="sum-label" style="color:var(--purple-txt)">MD sign-off needed</div>
+      <div class="sum-num" style="color:var(--purple-txt)">${mdN}</div>
+      <div class="sum-sub" style="color:var(--purple-txt)">waiting for MD</div>
+    </div>`
+
+  // Filter row
+  document.getElementById('filter-row').innerHTML = [
+    ['all','All projects',projects.length,''],
+    ['red','Blocked',red,'red-active'],
+    ['attention','Needs attention',red+amber,'amber-active'],
+    ['md','MD sign-off needed',mdN,''],
+  ].map(([f,label,cnt,extra]) =>
+    `<button class="filt ${pFilter===f?'active '+extra:''}" onclick="setPFilt('${f}')">${label} <span style="opacity:.6">${cnt}</span></button>`
+  ).join('')
+
+  // Stage bar
+  const stageCnts = {}
+  STAGES.forEach(s => stageCnts[s.id] = projects.filter(p => p.stage===s.id).length)
+  document.getElementById('pipeline-strip').innerHTML =
+    [{id:'all',short:'All',color:'#888780'},...STAGES].map(st => {
+      const cnt = st.id==='all' ? projects.length : (stageCnts[st.id]||0)
+      if (st.id!=='all' && cnt===0) return ''
+      const isAct = pStageFilter === st.id
+      return `<div class="pipe-tab ${isAct?'active':''}" style="border-bottom:2px solid ${isAct?st.color:'transparent'}" onclick="setPStage('${st.id}')">
+        <div class="pipe-dot" style="background:${st.color}"></div>
+        <div class="pipe-name" style="${isAct?`color:${st.color}`:''}">${st.short}</div>
+        <div class="pipe-count" style="color:${st.color}">${cnt}</div>
+      </div>`
+    }).join('')
+
+  // Cards
+  let visible = [...projects].sort((a,b) => stO(a.status)-stO(b.status))
+  if (pStageFilter !== 'all') visible = visible.filter(p => p.stage === pStageFilter)
+  if (pFilter === 'red') visible = visible.filter(p => p.status==='red')
+  if (pFilter === 'attention') visible = visible.filter(p => p.status!=='green')
+  if (pFilter === 'md') visible = visible.filter(p => p.alerts.some(a => a.mdAction))
+
+  if (!visible.length) {
+    document.getElementById('proj-cards').innerHTML = '<div class="empty">No projects match this filter.</div>'
+    return
+  }
+
+  document.getElementById('proj-cards').innerHTML = visible.map(p => {
+    const st = stFor(p.stage)
+    const lpc = LP_C[p.lp] || {bg:'#F1EFE8',tc:'#444'}
+    const days = daysAgo(p.movedAt)
+    const daysColor = days>14?'var(--red-txt)':days>7?'var(--amber-txt)':'var(--gray-400)'
+    const daysBg = days>14?'var(--red-lt)':days>7?'var(--amber-lt)':'var(--gray-50)'
+    const prog = p.progress
+    const pct = prog.pct_complete ? Math.round(prog.pct_complete) : 0
+    const isOpen = pOpenId === p.id
+    const sd = OWNER_STAGES[p.stage]
+    const allQs = sd ? sd.groups.flatMap(g=>g.qs) : []
+
+    const alertsHtml = p.alerts.map(a => {
+      const uc = a.urgency==='red'
+        ? {bg:'var(--red-lt)',border:'#F09595',tc:'var(--red-txt)'}
+        : a.urgency==='amber'
+        ? {bg:'var(--amber-lt)',border:'#FAC775',tc:'var(--amber-txt)'}
+        : {bg:'var(--green-lt)',border:'#C0DD97',tc:'var(--green-txt)'}
+      return `<div class="alert-item" style="background:${uc.bg};border-color:${uc.border}">
+        <span class="alert-icon">${a.icon}</span>
+        <div class="alert-body">
+          <div class="alert-title" style="color:${uc.tc}">${a.title}</div>
+          <div class="alert-sub" style="color:${uc.tc}">${a.sub}</div>
+        </div>
+        ${a.mdAction ? `<span class="md-req">MD required</span>` : ''}
+      </div>`
+    }).join('')
+
+    const clHtml = allQs.slice(0,5).map(q => `
+      <div class="pcl-item">
+        <div class="pcl-tick ${p.answers[q.id]==='yes'?'done':''}"></div>
+        <span class="pcl-text ${p.answers[q.id]==='yes'?'done':''}">${q.text}</span>
+        ${q.blocker && p.answers[q.id] !== 'yes' ? `<span class="blocker-bang">!</span>` : ''}
+      </div>`).join('')
+
+    return `<div class="pcard ${p.status} ${isOpen?'open':''}" onclick="pToggle('${p.id}')">
+      <div class="pcard-head">
+        <div class="pc-main">
+          <div class="pc-top">
+            <span class="pc-name">${p.name}</span>
+            <span class="pc-client">${p.client}</span>
+          </div>
+          <div class="pc-pills">
+            <span class="badge" style="background:${st.bg||'#F1EFE8'};color:${st.tc||'#444'}">${st.short}</span>
+            <span class="badge" style="background:${lpc.bg};color:${lpc.tc}">${p.lp}</span>
+            ${p.alerts.some(a=>a.urgency==='red') ? `<span class="badge" style="background:var(--red-lt);color:var(--red-txt)">⚠ Blocked</span>` : ''}
+            ${p.alerts.some(a=>a.mdAction) ? `<span class="badge" style="background:var(--purple-lt);color:var(--purple-txt)">🔒 MD</span>` : ''}
+            <span class="days-badge" style="background:${daysBg};color:${daysColor}">${days}d</span>
+            <div class="prog-mini">
+              <div class="prog-bar-mini"><div class="prog-fill-mini" style="width:${pct}%;background:${st.color}"></div></div>
+              <span style="font-size:10px;color:var(--gray-400)">${prog.done_count||0}/${prog.total_count||allQs.length}</span>
+            </div>
+          </div>
+          <div class="alert-row">${alertsHtml}</div>
+        </div>
+        <span style="font-size:12px;color:var(--gray-300);margin-top:4px;flex-shrink:0">${isOpen?'▲':'▼'}</span>
+      </div>
+      ${isOpen ? `
+        <div class="pcard-body">
+          <div><div class="pb-title">Stage checklist</div>${clHtml}</div>
+          <div><div class="pb-title">What needs attention</div>${alertsHtml}</div>
+        </div>
+        <div class="pcard-btns">
+          <button class="btn btn-primary" onclick="event.stopPropagation();setMainView('owner');selProj('${p.id}')">Open owner view</button>
+          <button class="btn" onclick="event.stopPropagation();openChecklist('${p.id}','${p.stage}','Lead Partner')">Open checklist →</button>
+        </div>` : ''}
+    </div>`
+  }).join('')
+}
+
+function setPFilt(f) { pFilter=f; renderPartners() }
+function setPStage(s) { pStageFilter=s; renderPartners() }
+function pToggle(id) { pOpenId = pOpenId===id ? null : id; renderPartners() }
+
+// ══════════════════════════════════════════════
+// ADD PROJECT
+// ══════════════════════════════════════════════
+function openAdd() { document.getElementById('modal').style.display = 'flex' }
+function closeModal() { document.getElementById('modal').style.display = 'none' }
+
+async function addProject() {
+  const name  = document.getElementById('m-name').value.trim()
+  const client = document.getElementById('m-client').value.trim()
+  const lp    = document.getElementById('m-lp').value.trim()
+  const stage = document.getElementById('m-stage').value
+  if (!name || !client) return alert('Project name and client are required.')
+
+  showSaving()
+  const { data, error } = await sbInsert('projects', {
+    deal_name:     name,
+    account_name:  client,
+    deal_owner:    lp || 'Unknown',
+    current_stage: stage,
+  })
+
+  if (error) { hideSaving(false); return }
+  hideSaving(true)
+  closeModal()
+  await loadDashboard()
+}
+
+// ══════════════════════════════════════════════
+// DEMO MODE LOADER
+// ══════════════════════════════════════════════
+function loadDemoData() {
+  const tickMap = {}
+  DEMO_TICKS.forEach(t => {
+    tickMap[`${t.project_id}__${t.stage_key}__${t.action_id}`] = {done:t.is_done, na:t.is_na||false}
+  })
+
+  projects = DEMO_PROJECTS.map(r => {
+    const answers = buildAnswers(r.id, r.current_stage, tickMap)
+    return {
+      id:         r.id,
+      name:       r.deal_name,
+      client:     r.account_name,
+      lp:         r.deal_owner,
+      stage:      r.current_stage,
+      movedAt:    r.updated_at,
+      answers,
+      condAnswers:{},
+      progress:   calcDemoProgress(r.id, r.current_stage, tickMap),
+      status:     calcStatus(r.id, r.current_stage, tickMap),
+      alerts:     buildAlerts(r, tickMap),
+    }
+  })
+
+  if (P.get('project')) {
+    const found = projects.find(p => p.id === P.get('project'))
+    if (found) ownerSelId = found.id
+  }
+  if (!ownerSelId) {
+    // Default to first project owned by current user, or first project
+    const myFirst = ownerFirstName
+      ? projects.find(p => p.lp && p.lp.toLowerCase().includes(ownerFirstName))
+      : null
+    ownerSelId = myFirst?.id || projects[0]?.id
+    if (ownerSelId) gridSelProj = ownerSelId
+  }
+  if (P.get('stage'))  ownerStage = P.get('stage')
+  if (P.get('view'))   setMainView(P.get('view'))
+  if (P.get('filter')) pFilter = P.get('filter')
+
+  document.getElementById('loading').style.display = 'none'
+
+  // Show demo banner
+  const banner = document.createElement('div')
+  banner.style.cssText = 'background:#FAEEDA;border-bottom:1px solid #FAC775;padding:7px 28px;font-size:11px;color:#633806;display:flex;align-items:center;gap:8px;'
+  banner.innerHTML = '<strong>Demo mode</strong> — showing sample data. Replace <code>SUPABASE_URL</code> and <code>SUPABASE_KEY</code> at the top of this file to connect to live data. Changes made here are not saved.'
+  document.querySelector('.main').insertBefore(banner, document.querySelector('.content'))
+
+  renderSidebar()
+  if (mainView === 'owner') renderOwner()
+  else renderGrid()
+}
+
+function calcDemoProgress(pid, stageKey, tickMap) {
+  const sd = OWNER_STAGES[stageKey]
+  if (!sd) return {done_count:0,total_count:0,pct_complete:0}
+  const qs = sd.groups.flatMap(g=>g.qs)
+  const done = qs.filter(q => tickMap[`${pid}__${stageKey}__${q.id}`]?.done === true).length
+  return {done_count:done, total_count:qs.length, pct_complete:Math.round((done/qs.length)*100)}
+}
+
+// In demo mode, writes update local state only (no Supabase)
+const _origWriteAnswer = writeAnswer
+async function writeAnswer(p, qid, val) {
+  if (DEMO_MODE) return // silently skip — demo banner explains why
+  return _origWriteAnswer(p, qid, val)
+}
+
+// In demo mode, skip Supabase insert for new projects
+const _origAddProject = addProject
+async function addProject() {
+  if (DEMO_MODE) {
+    const name  = document.getElementById('m-name').value.trim()
+    const client = document.getElementById('m-client').value.trim()
+    const lp    = document.getElementById('m-lp').value.trim()
+    const stage = document.getElementById('m-stage').value
+    if (!name || !client) return alert('Project name and client are required.')
+    const id = name.replace(/\s+/g,'-').substring(0,12) + '-' + Date.now()
+    projects.push({id,name,client,lp:lp||'—',stage,movedAt:new Date().toISOString().split('T')[0],answers:{},condAnswers:{},progress:{done_count:0,total_count:0,pct_complete:0},status:'green',alerts:[{icon:'✅',title:'Just added',sub:'Begin stage checklist.',mdAction:false,urgency:'green'}]})
+    ownerSelId = id
+    closeModal()
+    renderSidebar()
+    renderOwner()
+    return
+  }
+  return _origAddProject()
+}
+
+
+// ══════════════════════════════════════════════
+// GRID VIEW
+// ══════════════════════════════════════════════
+// GRID_ROWS — curated key actions, exact text from handbook v1.3
+const GRID_ROWS = [
+  { group: 'Zoho CRM', icon: '🗄', items: [
+    { id:'crm1',
+      label:'CRM updated: stage, dates & amount',
+      sub:'Stage · start date · end date · contract amount',
+      applicable:['discussions','scoping','pricing','contracting','executing','closing','hold'],
+      blocker:true },
+    { id:'crm2',
+      label:'Co-owners recorded in CRM with proposal cost agreement in place',
+      sub:'Co-owners share proposal costs proportionally if deal does not materialise',
+      applicable:['scoping'], blocker:true, conditional:true },
+  ]},
+  { group: 'Pricing sheet', icon: '💰', items: [
+    { id:'cl5',
+      label:'Store final Pricing Sheet v4 in Confidential folder',
+      sub:'MD sign-off obtained · Torr / SharePoint · MD access only',
+      applicable:['pricing'], blocker:true },
+  ]},
+  { group: 'Client', icon: '🏢', items: [
+    { id:'cl1',
+      label:'Draft and agree client SOW — signed and stored in Confidential folder',
+      sub:'MD signs all SoWs · via Zoho Sign · CC Consulting MD and Iryna',
+      applicable:['contracting'], blocker:true },
+    { id:'cl2',
+      label:'Complete risk and regulation steps (KYC, AML, Confidential status) — if required',
+      sub:'Required when client contract demands it (regulated FIs) · Iryna manages',
+      applicable:['contracting'], blocker:true, conditional:true },
+  ]},
+  { group: 'Team', icon: '👥', items: [
+    { id:'tm2',
+      label:'Prepare Zoho Sign NDA contracts for all project team members — if needed',
+      sub:'Iryna · Trimstone_Standard NDA_Corporate_Template.docx · via Zoho Sign',
+      applicable:['contracting'], blocker:false, conditional:true },
+    { id:'tm1',
+      label:'Consulting MD countersigns all executed MSAs — saved in Confidential folder',
+      sub:'Iryna drafts · MD countersigns · Zoho Sign / Torr / SharePoint',
+      applicable:['contracting'], blocker:true },
+    { id:'tm3a',
+      label:'Create new Microsoft Trimstone corporate accounts for incoming subcontractors',
+      sub:'James / William · if required for new team members',
+      applicable:['contracting'], blocker:true },
+    { id:'tm3b',
+      label:'Grant access to Torr Portal',
+      sub:'James · all incoming team members',
+      applicable:['contracting'], blocker:true },
+    { id:'tm3c',
+      label:'Issue WeWork passes',
+      sub:'Miguel · WeWork logistics shared with team',
+      applicable:['contracting'], blocker:true },
+    { id:'tm1_close',
+      label:'Remove Trimstone system access for all consultants rolling off the project',
+      sub:'James / Ops · M365 / Torr / Xero · exceptions must be recorded',
+      applicable:['closing'], blocker:true, _realId:'tm1' },
+  ]},
+  { group: 'Xero', icon: '🧾', items: [
+    { id:'xero1',
+      label:'Set up Client/Project in Xero — finance code must match Torr Portal code',
+      sub:'Filip · include forecasts, partners, subcontractors, consultants per pricing sheet',
+      applicable:['executing'], blocker:true },
+    { id:'xero_acc',
+      label:'Give access to Xero (expense submission)',
+      sub:'Filip / Miguel · all team members',
+      applicable:['executing'], blocker:true },
+    { id:'tm2',
+      label:'Train team on Xero (expenses · Appendix B) and Torr timesheets',
+      sub:'LP / Project PMO · all team before delivery begins',
+      applicable:['executing'], blocker:true },
+    { id:'xero2',
+      label:'Final invoice issued and financial closure confirmed in Xero',
+      sub:'Filip · all expenses cleared first · partner profit payout calculated',
+      applicable:['closing'], blocker:true },
+  ]},
+  { group: 'Torr Portal', icon: '📋', items: [
+    { id:'tm4',
+      label:'Add team members in Torr Team tab — complete role, hours, project fields',
+      sub:'LP supports · all required fields completed before timesheets can be enabled',
+      applicable:['contracting'], blocker:true },
+    { id:'tm5',
+      label:'Train team on Torr (timesheets, TAIA, folders) and WeWork logistics',
+      sub:'LP / Project PMO · confirm all can log in and submit timesheets',
+      applicable:['contracting'], blocker:true },
+    { id:'torr1',
+      label:'Timesheets enabled in Torr and weekly entry confirmed for all team members',
+      sub:'Lead Partner approves timesheets weekly',
+      applicable:['executing'], blocker:true },
+  ]},
+]
+
+
+
+let gridSelProj = null
+let gridOpenCell = null // {itemId, stageId}
+
+let _gridCache = {pid: null, html: null}
+
+function renderGrid() {
+  const el = document.getElementById('grid-container')
+  if (!el) return
+  if (!projects.length) { el.innerHTML = '<div class="empty">No projects loaded.</div>'; return }
+
+  if (!gridSelProj) gridSelProj = projects[0].id
+  const p = projects.find(x => x.id === gridSelProj) || projects[0]
+
+  // Always update topbar badge with current project + Zoho link
+  const _badge = document.getElementById('topbar-badge')
+  if (_badge && p) {
+    const st = stFor(p.stage)
+    const zohoId = p.id.replace('zcrm_', '')
+    const zohoUrl = 'https://crm.zoho.eu/crm/org20109486492/tab/Potentials/' + zohoId
+    _badge.innerHTML = '<span style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="window.open(\'' + zohoUrl + '\',\'_blank\')" title="Open in Zoho CRM">' + p.name + ' <span style="font-size:12px">🔗</span></span>'
+    _badge.style.cssText = 'background:' + st.bg + ';color:' + st.tc + ';padding:3px 10px;border-radius:10px;font-size:11px;font-weight:500;cursor:pointer'
+  }
+
+  // Project pills — removed from top, now in sidebar grouped by stage
+  const pills = ''
+
+  // Legend
+  const legend = `<div class="grid-legend">
+    <div class="gl-item"><div class="gl-dot" style="background:var(--green-lt);color:var(--green-txt)">✓</div> Done</div>
+    <div class="gl-item"><div class="gl-dot" style="background:var(--red-lt);color:var(--red-txt)">✗</div> Not yet</div>
+    <div class="gl-item"><div class="gl-dot" style="background:var(--gray-50);border:1px solid var(--gray-200);color:var(--gray-300)">—</div> N/A</div>
+    <div class="gl-item"><div class="gl-dot" style="background:var(--amber-lt);color:var(--amber-txt)">?</div> If needed</div>
+    <div class="gl-item"><div class="gl-dot" style="background:transparent;border:1.5px dashed var(--gray-200);color:var(--gray-300)">?</div> Unanswered</div>
+    <span style="margin-left:auto;font-size:11px;color:var(--gray-400);display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+      <span>Click any cell to update</span>
+      <span style="opacity:.4">·</span>
+      <strong style="color:var(--gray-800)">${p.name}</strong>
+      ${p.client ? `<span style="opacity:.4">·</span><span style="color:var(--gray-600);font-weight:500">${p.client}</span>` : ''}
+      ${p.lp ? `<span style="opacity:.4">·</span><span style="color:var(--gray-400)">${p.lp}</span>` : ''}
+    </span>
+  </div>`
+
+  // Build table
+  let html = `<div class="grid-proj-pills">${pills}</div>${legend}<div class="grid-wrap"><table class="gtable">`
+
+  // Header row
+  html += '<thead><tr><th class="th-label"></th>'
+  STAGES.forEach(st => {
+    const isCur = st.id === p.stage
+    html += `<th class="th-stage ${isCur?'cur':''}" style="border-bottom:2px solid ${isCur?st.color:'transparent'}">
+      <div class="th-dot-g" style="background:${st.color}"></div>
+      <div style="font-size:9px;font-weight:500;color:${isCur?st.color:'var(--gray-400)'}">${st.short}</div>
+      ${isCur?`<div class="th-now-g" style="color:${st.color}">▶ now</div>`:'<div style="height:11px"></div>'}
+    </th>`
+  })
+  html += '</tr></thead><tbody>'
+
+  // Rows
+  GRID_ROWS.forEach(grp => {
+    // Group header row with counts
+    html += '<tr class="g-group-row">'
+    html += `<td class="g-grp-label">${grp.icon} ${grp.group}</td>`
+    STAGES.forEach(st => {
+      const rel = grp.items.filter(it => it.applicable.includes(st.id))
+      if (!rel.length) { html += '<td></td>'; return }
+      const done = rel.filter(it => {
+        const ans = (p.answers||{})[it.id]
+        return ans === 'yes'
+      }).length
+      const isCur = st.id === p.stage
+      html += `<td style="${isCur?`color:${st.color};font-weight:600`:''}" class="g-count ${done>0?'has-done':''}">${done}/${rel.length}</td>`
+    })
+    html += '</tr>'
+
+    // Item rows
+    grp.items.forEach(item => {
+      html += '<tr class="g-action-row">'
+      const isCondLabel = item.conditional
+      html += `<td class="g-row-label ${isCondLabel?'cond-lbl':''}">${item.label}${item.conditional?' <span style="font-size:9px;color:var(--amber)">if needed</span>':''}</td>`
+
+      STAGES.forEach(st => {
+        if (!item.applicable.includes(st.id)) {
+          html += `<td style="text-align:center;color:var(--gray-200);font-size:11px">—</td>`
+          return
+        }
+
+        const isCur = st.id === p.stage
+        const ans = (p.answers||{})[item.id]
+        const condKey = `${p.stage}_${item.id}_req`
+        const condAns = (p.condAnswers||{})[condKey]
+        const isOpen = gridOpenCell && gridOpenCell.itemId === item.id && gridOpenCell.stageId === st.id && gridOpenCell.projId === p.id
+
+        // Get tick state for this specific stage
+        const _tickId = item._realId || item.id
+        const stageAns = getStageAnswer(p, _tickId, st.id)
+        const stageCond = getStageCondAns(p, _tickId, st.id)
+
+        // Determine tick state — no auto-tick
+        let tickCls, tickIcon
+        if (item.conditional) {
+          if (stageCond === 'na') { tickCls='na'; tickIcon='—' }
+          else if (stageCond === 'yes') {
+            if (stageAns==='yes') { tickCls='done'; tickIcon='✓' }
+            else if (stageAns==='no') { tickCls='nope'; tickIcon='✗' }
+            else { tickCls='unanswered'; tickIcon='?' }
+          } else { tickCls='cond'; tickIcon='◎' }
+        } else {
+          if (stageAns==='yes')     { tickCls='done'; tickIcon='✓' }
+          else if (stageAns==='no') { tickCls='nope'; tickIcon='✗' }
+          else if (stageAns==='na') { tickCls='na'; tickIcon='—' }
+          else                      { tickCls='unanswered'; tickIcon='' }
+        }
+
+        const isBlocker = item.blocker && isCur && tickCls!=='done' && tickCls!=='na'
+        const popupHtml = isOpen ? buildCellPopup(item, st, p, stageAns, stageCond, condKey) : ''
+
+        const stageIds = STAGES.map(s => s.id)
+        const curIdx  = stageIds.indexOf(p.stage)
+        const thisIdx = stageIds.indexOf(st.id)
+        const isPast  = thisIdx < curIdx
+        const isFuture = thisIdx > curIdx
+
+        if (isCur) {
+          // Only current stage is clickable
+          const _tid = item._realId || item.id
+          html += `<td class="gcell cur-stage" onclick="toggleCellPopup('${_tid}','${st.id}','${p.id}',event)" style="position:relative">
+            <div class="tick ${tickCls} ${isBlocker?'blocker':''}">${tickIcon}</div>
+            ${popupHtml}
+          </td>`
+        } else {
+          // All other stages — read only
+          const opacity = isPast ? '0.5' : '0.3'
+          const title   = isPast ? 'Completed stage — read only' : 'Future stage — not yet reached'
+          html += `<td class="gcell-readonly" style="text-align:center;vertical-align:middle;padding:3px 2px;cursor:default" title="${title}">
+            <div class="tick ${tickCls}" style="opacity:${opacity}">${tickIcon}</div>
+          </td>`
+        }
+      })
+      html += '</tr>'
+    })
+  })
+
+  html += '</tbody></table></div>'
+  el.innerHTML = html
+  _gridCache = {pid: p.id}
+}
+
+function buildCellPopup(item, st, p, ans, condAns, condKey) {
+  let inner = `<div class="cell-popup-title">${item.label}</div>
+    <div class="cell-popup-stage" style="color:${st.color}">${st.short}${st.id===p.stage?' · current stage':''}</div>`
+
+  const al = ACTION_LINKS[item.id]
+  const spBtn = al
+    ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-100)">
+        <button onclick="event.stopPropagation();window.open('${al.url}','_blank')"
+          style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+                 font-size:11px;padding:6px 12px;border-radius:6px;
+                 border:1px solid #B5D4F4;background:#E6F1FB;color:#0C447C;
+                 cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">
+          ${al.icon} Open ${al.label} in SharePoint →
+        </button>
+       </div>`
+    : ''
+
+  if (item.conditional && st.id === p.stage) {
+    if (!condAns || condAns === undefined) {
+      inner += `<div class="cond-confirm">
+        <div class="cond-q">Is this required for ${p.name}?</div>
+        <div class="cond-btns">
+          <button class="cdb req" onclick="gridSetCond('${condKey}','yes',event)">✓ Yes — required${item.blocker?' (Critical)':''}</button>
+          <button class="cdb skip" onclick="gridSetCond('${condKey}','na',event)">— Not needed</button>
+        </div>
+      </div>`
+    } else if (condAns === 'yes') {
+      // KYC link after Yes
+      const kycLink = (item.id === 'cl2' && ans === 'yes')
+        ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-100)">
+            <button onclick="event.stopPropagation();window.open('${KYC_LINK.url}','_blank')"
+              style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+                     font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid #B5D4F4;
+                     background:#E6F1FB;color:#0C447C;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">
+              ${KYC_LINK.icon} Open ${KYC_LINK.label} in SharePoint →
+            </button></div>`
+        : ''
+      inner += `<div class="cell-popup-btns">
+        <button class="cpb y" onclick="gridSetAnswer('${item.id}','yes',event)">✓ Yes — done</button>
+        <button class="cpb n" onclick="gridSetAnswer('${item.id}','no',event)">✗ Not yet</button>
+        <button class="cpb na" onclick="gridSetCond('${condKey}','na',event)" style="font-size:10px;padding:4px 8px">undo</button>
+      </div>
+      ${ans === 'yes' ? (spBtn || kycLink) : ''}`
+    } else {
+      inner += `<div style="font-size:11px;color:var(--gray-400);margin-bottom:8px">Marked as not required.</div>
+        <button class="cpb na" onclick="gridSetCond('${condKey}',undefined,event)">Change</button>`
+    }
+  } else {
+    // Only show N/A for optional (non-blocker) items
+    const naBtn = !item.blocker
+      ? `<button class="cpb na" onclick="gridSetAnswer('${item.id}','na',event)">— N/A</button>`
+      : ''
+    inner += `<div class="cell-popup-btns">
+      <button class="cpb y" onclick="gridSetAnswer('${item.id}','yes',event)">✓ Yes — done</button>
+      <button class="cpb n" onclick="gridSetAnswer('${item.id}','no',event)">✗ Not yet</button>
+      ${naBtn}
+    </div>
+    ${ans === 'yes' ? spBtn : ''}`
+  }
+
+  // Zoho CRM link — only for CRM group items
+  const isCrmItem = item.id.startsWith('crm')
+  if (isCrmItem) {
+    const zohoUrl = 'https://crm.zoho.eu/crm/org20109486492/tab/Potentials/' + p.id.replace('zcrm_', '')
+    inner += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-100)">
+      <button onclick="event.stopPropagation();window.open('${zohoUrl}','_blank')"
+        style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+               font-size:11px;padding:5px 12px;border-radius:6px;
+               border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-600);
+               cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">
+        🔗 Open deal in Zoho CRM →
+      </button>
+    </div>`
+  }
+
+  return `<div class="cell-popup" onclick="event.stopPropagation()">${inner}</div>`
+}
+
+function toggleCellPopup(itemId, stageId, projId, event) {
+  event.stopPropagation()
+  if (gridOpenCell && gridOpenCell.itemId===itemId && gridOpenCell.stageId===stageId && gridOpenCell.projId===projId) {
+    gridOpenCell = null
+  } else {
+    gridOpenCell = {itemId, stageId, projId}
+  }
+  renderGrid()
+}
+
+// Close popup on outside click
+document.addEventListener('click', () => { if(gridOpenCell){gridOpenCell=null;renderGrid()} })
+
+// Per-stage answer helpers — answers are keyed by stageKey__actionId in full data
+// For the current stage they're in p.answers; for other stages we need the raw tick data
+function getStageAnswer(p, actionId, stageId) {
+  if (stageId === p.stage) return (p.answers||{})[actionId]
+  // Check allTicks cache
+  const key = p.id + '__' + stageId + '__' + actionId
+  const t = allTicksCache[key]
+  if (!t) return undefined
+  return t.na ? 'na' : t.done ? 'yes' : 'no'
+}
+function getStageCondAns(p, actionId, stageId) {
+  if (stageId === p.stage) {
+    const key = stageId + '_' + actionId + '_req'
+    return (p.condAnswers||{})[key]
+  }
+  return undefined // for other stages, treat as not confirmed
+}
+
+function gridSelProject(id) { gridSelProj=id; gridOpenCell=null; renderGrid() }
+
+async function gridSetAnswer(qid, val, event) {
+  event.stopPropagation()
+  const p = projects.find(x => x.id === gridSelProj)
+  if (!p) return
+  const stageId = gridOpenCell ? gridOpenCell.stageId : p.stage
+  // Update local state
+  if (stageId === p.stage) {
+    p.answers[qid] = val
+    p.status = recalcStatus(p)
+  }
+  // Update cache
+  const cacheKey = p.id + '__' + stageId + '__' + qid
+  allTicksCache[cacheKey] = { done: val==='yes', na: val==='na' }
+  // Keep popup open if Yes was clicked and there's a SharePoint link — so link shows immediately
+  const shouldKeepOpen = val === 'yes' && (ACTION_LINKS[qid] || (qid === 'cl2' && stageId === 'contracting'))
+  if (!shouldKeepOpen) {
+    gridOpenCell = null
+  }
+  renderGrid()
+  // Write to Supabase with correct stage
+  const isDone = val === 'yes'
+  const isNa   = val === 'na'
+  await sbUpsert('ticks', {
+    project_id: p.id, stage_key: stageId, action_id: qid,
+    is_done: isDone, is_na: isNa,
+    last_toggled_by: currentUser, last_toggled_role: currentRole,
+    last_toggled_at: new Date().toISOString(),
+  }, 'project_id,action_id')
+  showSaving(); hideSaving(true)
+}
+
+function gridSetCond(key, val, event) {
+  event.stopPropagation()
+  const p = projects.find(x => x.id === gridSelProj)
+  if (!p) return
+  if (!p.condAnswers) p.condAnswers = {}
+  if (val === undefined) delete p.condAnswers[key]
+  else p.condAnswers[key] = val
+  // Keep popup open when marking as required (val='yes') so user can then tick Yes/No
+  if (val !== 'yes') gridOpenCell = null
+  renderGrid()
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+loadDashboard()
+</script>
+</body>
+</html>
